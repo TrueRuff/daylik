@@ -26,3 +26,16 @@ export function formatDays(days) {
     .map((d) => DAY_NAMES[d - 1])
     .join(', ');
 }
+
+// Timestamp -> значение поля datetime-local ('YYYY-MM-DDTHH:mm', локальное время)
+export function tsToLocalInput(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Значение datetime-local -> timestamp; пустая строка -> null
+export function localInputToTs(val) {
+  return val ? new Date(val).getTime() : null;
+}

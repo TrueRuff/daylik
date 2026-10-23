@@ -1,8 +1,9 @@
 // Экран «День»: таймлайн 00:00–24:00 — рутины, поставленные дела, свободные окна
 
-import { getPractices, getTasks, updateTask } from '../core/storage.js';
-import { practiceAppliesOn, minutesToTime } from '../core/schedule.js';
+import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres } from '../core/storage.js';
+import { practiceAppliesOn, minutesToTime, tsToLocalInput, localInputToTs } from '../core/schedule.js';
 import { buildDay, computeFreeWindows, sortCandidates } from '../core/dayPlan.js';
+import { GROUP_TITLES } from '../core/models.js';
 import { escapeHtml } from './dom.js';
 
 const PX_PER_MIN = 0.8;
@@ -18,7 +19,8 @@ function todayWeekday() {
 
 export function initDayScreen(root) {
   let picker = null; // окно, для которого открыт выбор дела
-  let state = null;  // данные текущей отрисовки
+  let editing = null; // id редактируемого дела
+  let state = null;   // данные текущей отрисовки
 
   async function render() {
     const date = todayStr();
@@ -27,6 +29,10 @@ export function initDayScreen(root) {
 
     const todo = await getTasks({ status: 'todo' });
     const done = (await getTasks({ status: 'done' })).sort((a, b) => b.createdAt - a.createdAt);
+    const spheres = await getAllSpheres();
+    const allTasks = [...todo, ...done];
+    const editTask = editing ? allTasks.find((t) => t.id === editing) : null;
+    if (editing && !editTask) editing = null;
     const scheduled = todo
       .filter((t) => t.scheduledDate === date)
       .sort((a, b) => a.scheduledStart - b.scheduledStart);
@@ -48,7 +54,7 @@ export function initDayScreen(root) {
     const placeable = sortCandidates(unscheduled.filter(fits));
     const postponed = unscheduled.filter((t) => !fits(t));
 
-    state = { date, routines, scheduled, unscheduled, windows };
+    state = { date, routines, scheduled, unscheduled, windows, allTasks };
 
     root.innerHTML = `
       <div class="row between">
@@ -56,6 +62,7 @@ export function initDayScreen(root) {
         <button id="auto-place" class="secondary">Разложить автоматически</button>
       </div>
       ${picker ? pickerHtml(picker, placeable) : ''}
+      ${editTask ? editCardHtml(editTask, spheres) : ''}
       <div class="day-wrap">
         <div class="timeline">
           ${hoursHtml()}
@@ -100,7 +107,40 @@ export function initDayScreen(root) {
         ${placeable
           ? `<button class="side-task" data-id="${t.id}" title="Поставить в первое подходящее окно">${label}</button>`
           : `<span class="task-label">${label}</span>`}
+        <button class="edit-btn" data-id="${t.id}" title="Редактировать">✎</button>
         <button class="done-btn" data-id="${t.id}" title="Отметить сделанным">✓</button>
+      </div>`;
+  }
+
+  function editCardHtml(t, spheres) {
+    return `
+      <div class="card">
+        <div class="row between">
+          <strong>Редактирование дела</strong>
+          <button id="edit-close" class="secondary">Закрыть</button>
+        </div>
+        <label>Название <input id="e-title" value="${escapeHtml(t.title)}"></label>
+        <div class="row">
+          <label>Длительность, мин <input id="e-dur" type="number" min="5" step="5" value="${t.durationMin}"></label>
+          <label>Группа
+            <select id="e-group">
+              ${['Н', 'Ж', 'П'].map((g) =>
+                `<option value="${g}"${g === t.group ? ' selected' : ''}>${g} — ${GROUP_TITLES[g]}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <label>Сфера
+          <select id="e-sphere">
+            <option value="">без сферы</option>
+            ${spheres.map((s) =>
+              `<option value="${s.id}"${s.id === t.sphereId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+          </select>
+        </label>
+        <label>Напомнить <input id="e-remind" type="datetime-local" value="${tsToLocalInput(t.dueAt)}"></label>
+        <div class="row">
+          <button id="e-save" data-id="${t.id}">Сохранить</button>
+          <button id="e-delete" data-id="${t.id}" class="danger">Удалить дело</button>
+        </div>
       </div>`;
   }
 
@@ -165,6 +205,47 @@ export function initDayScreen(root) {
       return;
     }
     if (e.target.closest('#picker-close')) {
+      picker = null;
+      render();
+      return;
+    }
+    if (e.target.closest('#edit-close')) {
+      editing = null;
+      render();
+      return;
+    }
+
+    if (e.target.id === 'e-save') {
+      const t = state.allTasks.find((x) => x.id === e.target.dataset.id);
+      const patch = {
+        title: root.querySelector('#e-title').value.trim(),
+        durationMin: Number(root.querySelector('#e-dur').value) || 30,
+        group: root.querySelector('#e-group').value,
+        sphereId: root.querySelector('#e-sphere').value || null,
+        dueAt: localInputToTs(root.querySelector('#e-remind').value),
+      };
+      if (!patch.title) return;
+      // при смене длительности место на таймлайне могло перестать подходить
+      if (t.scheduledDate && patch.durationMin !== t.durationMin) {
+        patch.scheduledDate = null;
+        patch.scheduledStart = null;
+      }
+      await updateTask(t.id, patch);
+      editing = null;
+      render();
+      return;
+    }
+
+    if (e.target.id === 'e-delete') {
+      await deleteTask(e.target.dataset.id);
+      editing = null;
+      render();
+      return;
+    }
+
+    const editBtn = e.target.closest('.edit-btn');
+    if (editBtn) {
+      editing = editBtn.dataset.id;
       picker = null;
       render();
       return;

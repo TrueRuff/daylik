@@ -2,8 +2,8 @@
 
 import { categorize } from '../core/categorize.js';
 import { Task, Sphere, Practice, GROUP_TITLES } from '../core/models.js';
-import { saveTask, saveSphere, savePractice } from '../core/storage.js';
-import { DAY_NAMES, timeToMinutes } from '../core/schedule.js';
+import { saveTask, saveSphere, savePractice, getAllSpheres } from '../core/storage.js';
+import { DAY_NAMES, timeToMinutes, localInputToTs } from '../core/schedule.js';
 import { escapeHtml } from './dom.js';
 
 const KIND_TITLES = { sphere: 'Сфера', task: 'Дело', routine: 'Практика' };
@@ -32,8 +32,8 @@ export function initInputScreen(root) {
   async function parse() {
     const text = rawEl.value.trim();
     if (!text) return;
-    const parsed = await categorize(text);
-    state = { parsed, rawText: text, group: parsed.group || 'П' };
+    const [parsed, spheres] = await Promise.all([categorize(text), getAllSpheres()]);
+    state = { parsed, rawText: text, group: parsed.group || 'П', spheres };
     renderConfirm();
   }
 
@@ -60,7 +60,16 @@ export function initInputScreen(root) {
           ${DAY_NAMES.map((d, i) => `<label class="day"><input type="checkbox" data-day="${i + 1}" checked>${d}</label>`).join('')}
         </div>` : ''}
         ${parsed.kind === 'task' ? `
-        <label>Напомнить (необязательно) <input id="c-remind" type="datetime-local"></label>` : ''}
+        <div class="row">
+          <label>Длительность, мин <input id="c-dur" type="number" min="5" step="5" value="${parsed.durationMin || 30}"></label>
+          <label>Напомнить (необязательно) <input id="c-remind" type="datetime-local"></label>
+        </div>
+        <label>Сфера
+          <select id="c-sphere">
+            <option value="">без сферы</option>
+            ${state.spheres.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+          </select>
+        </label>` : ''}
         <div class="row"><button id="c-save">Сохранить</button></div>
       </div>`;
   }
@@ -93,18 +102,21 @@ export function initInputScreen(root) {
       }));
       saved(`Практика «${title}» сохранена, она появится в расписании дня.`);
     } else {
-      const remind = confirmEl.querySelector('#c-remind')?.value;
+      const dur = Number(confirmEl.querySelector('#c-dur').value) || 30;
+      const remind = confirmEl.querySelector('#c-remind').value;
+      const sphereId = confirmEl.querySelector('#c-sphere').value || null;
       await saveTask(new Task({
         id,
         rawText,
         title,
         group: state.group,
-        durationMin: parsed.durationMin || 30,
-        dueAt: remind ? new Date(remind).getTime() : null,
+        durationMin: dur,
+        sphereId,
+        dueAt: localInputToTs(remind),
         status: 'todo',
         source: parsed.provider,
       }));
-      saved(`Дело «${title}» сохранено, группа ${state.group}.`);
+      saved(`Дело «${title}» сохранено, группа ${state.group}.${remind ? ' Напомню в срок.' : ''}`);
     }
   });
 
