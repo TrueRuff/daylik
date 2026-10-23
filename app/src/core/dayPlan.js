@@ -17,19 +17,6 @@ export function sortCandidates(tasks) {
   });
 }
 
-// Первый подходящий свободный интервал, куда влезает дело длительностью durationMin.
-// Возвращает [start, end] или null.
-export function findFreeWindow(blocks, durationMin) {
-  const sorted = [...blocks].sort((a, b) => a.start - b.start);
-  let cursor = 0;
-  for (const b of sorted) {
-    if (b.start - cursor >= durationMin) return [cursor, cursor + durationMin];
-    cursor = Math.max(cursor, b.end);
-  }
-  if (MINUTES_IN_DAY - cursor >= durationMin) return [cursor, cursor + durationMin];
-  return null;
-}
-
 // Все свободные промежутки между блоками
 export function computeFreeWindows(blocks) {
   const sorted = [...blocks].sort((a, b) => a.start - b.start);
@@ -41,6 +28,12 @@ export function computeFreeWindows(blocks) {
   }
   if (MINUTES_IN_DAY - cursor > 0) out.push({ start: cursor, end: MINUTES_IN_DAY });
   return out;
+}
+
+// Первое свободное окно, куда влезает дело длительностью durationMin: [start, end] или null
+export function findFreeWindow(blocks, durationMin) {
+  const w = computeFreeWindows(blocks).find((x) => x.end - x.start >= durationMin);
+  return w ? [w.start, w.start + durationMin] : null;
 }
 
 /**

@@ -1,13 +1,12 @@
 // Экран «Ввод»: свободный текст → разбор → подтверждение типа и группы → сохранение
 
 import { categorize } from '../core/categorize.js';
-import { Task, Sphere, Practice } from '../core/models.js';
+import { Task, Sphere, Practice, GROUP_TITLES } from '../core/models.js';
 import { saveTask, saveSphere, savePractice } from '../core/storage.js';
 import { DAY_NAMES, timeToMinutes } from '../core/schedule.js';
 import { escapeHtml } from './dom.js';
 
 const KIND_TITLES = { sphere: 'Сфера', task: 'Дело', routine: 'Практика' };
-const GROUP_TITLES = { 'Н': 'Необходимо', 'Ж': 'Желательно', 'П': 'Полезно' };
 const PROVIDER_TITLES = { rules: 'разобрано по словарю', llm: 'разобрано через API' };
 
 export function initInputScreen(root) {
@@ -60,6 +59,8 @@ export function initInputScreen(root) {
         <div class="days">
           ${DAY_NAMES.map((d, i) => `<label class="day"><input type="checkbox" data-day="${i + 1}" checked>${d}</label>`).join('')}
         </div>` : ''}
+        ${parsed.kind === 'task' ? `
+        <label>Напомнить (необязательно) <input id="c-remind" type="datetime-local"></label>` : ''}
         <div class="row"><button id="c-save">Сохранить</button></div>
       </div>`;
   }
@@ -92,12 +93,14 @@ export function initInputScreen(root) {
       }));
       saved(`Практика «${title}» сохранена, она появится в расписании дня.`);
     } else {
+      const remind = confirmEl.querySelector('#c-remind')?.value;
       await saveTask(new Task({
         id,
         rawText,
         title,
         group: state.group,
         durationMin: parsed.durationMin || 30,
+        dueAt: remind ? new Date(remind).getTime() : null,
         status: 'todo',
         source: parsed.provider,
       }));

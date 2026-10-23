@@ -1,14 +1,12 @@
 // Экран «Сферы»: три группы Н/Ж/П, карточка сферы с описаниями и практиками
 
-import { Sphere, Practice } from '../core/models.js';
+import { Sphere, Practice, GROUP_TITLES } from '../core/models.js';
 import {
   getAllSpheres, saveSphere, deleteSphere,
   getPractices, savePractice, deletePractice,
 } from '../core/storage.js';
 import { DAY_NAMES, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { escapeHtml } from './dom.js';
-
-const GROUP_TITLES = { 'Н': 'Необходимо', 'Ж': 'Желательно', 'П': 'Полезно' };
 
 export function initSpheresScreen(root) {
   async function renderList() {

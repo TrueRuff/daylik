@@ -2,6 +2,8 @@
 
 export const GROUPS = ['Н', 'Ж', 'П']; // Необходимо / Желательно / Полезно
 
+export const GROUP_TITLES = { 'Н': 'Необходимо', 'Ж': 'Желательно', 'П': 'Полезно' };
+
 export class Sphere {
   constructor({ id, name, group, brief = '', details = '', createdAt = Date.now() }) {
     this.id = id;

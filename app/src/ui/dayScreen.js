@@ -26,6 +26,7 @@ export function initDayScreen(root) {
     const routines = practices.map((p) => ({ start: p.start, end: p.end, label: p.title }));
 
     const todo = await getTasks({ status: 'todo' });
+    const done = (await getTasks({ status: 'done' })).sort((a, b) => b.createdAt - a.createdAt);
     const scheduled = todo
       .filter((t) => t.scheduledDate === date)
       .sort((a, b) => a.scheduledStart - b.scheduledStart);
@@ -65,18 +66,19 @@ export function initDayScreen(root) {
         <div class="side">
           <h3>Дела</h3>
           ${placeable.length
-            ? placeable.map((t) => `
-              <button class="side-task" data-id="${t.id}" title="Поставить в первое подходящее окно">
-                <span class="badge">${t.group}</span>${escapeHtml(t.title)} <span class="muted">${t.durationMin} мин</span>
-              </button>`).join('')
+            ? placeable.map((t) => taskRowHtml(t, true)).join('')
             : '<p class="muted">нет свободных дел</p>'}
           <h3>На потом</h3>
           ${postponed.length
-            ? postponed.map((t) => `
-              <div class="side-postponed">
-                <span class="badge">${t.group}</span>${escapeHtml(t.title)} <span class="muted">${t.durationMin} мин</span>
-              </div>`).join('')
+            ? postponed.map((t) => taskRowHtml(t, false)).join('')
             : '<p class="muted">всё помещается</p>'}
+          <h3>Сделано</h3>
+          ${done.length
+            ? done.slice(0, 10).map((t) => `
+              <button class="done-item" data-id="${t.id}" title="Вернуть в дела">
+                <span class="badge">${t.group}</span>${escapeHtml(t.title)}
+              </button>`).join('')
+            : '<p class="muted">пока ничего</p>'}
         </div>
       </div>`;
   }
@@ -90,12 +92,25 @@ export function initDayScreen(root) {
     return html;
   }
 
+  function taskRowHtml(t, placeable) {
+    const label = `
+      <span class="badge">${t.group}</span>${escapeHtml(t.title)} <span class="muted">${t.durationMin} мин</span>`;
+    return `
+      <div class="task-row">
+        ${placeable
+          ? `<button class="side-task" data-id="${t.id}" title="Поставить в первое подходящее окно">${label}</button>`
+          : `<span class="task-label">${label}</span>`}
+        <button class="done-btn" data-id="${t.id}" title="Отметить сделанным">✓</button>
+      </div>`;
+  }
+
   function blockHtml(b) {
     const height = Math.max((b.end - b.start) * PX_PER_MIN, 16);
-    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="Убрать из дня"` : '';
+    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="Клик — убрать из дня"` : '';
+    const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="Сделано">✓</span>` : '';
     return `
       <div class="tl-block tl-${b.kind}"${attrs} style="top:${b.start * PX_PER_MIN}px;height:${height}px">
-        ${minutesToTime(b.start)} ${escapeHtml(b.label)}
+        ${minutesToTime(b.start)} ${escapeHtml(b.label)}${done}
       </div>`;
   }
 
@@ -170,6 +185,20 @@ export function initDayScreen(root) {
       return;
     }
 
+    const doneBtn = e.target.closest('.done-btn');
+    if (doneBtn) {
+      await updateTask(doneBtn.dataset.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+      render();
+      return;
+    }
+
+    const doneItem = e.target.closest('.done-item');
+    if (doneItem) {
+      await updateTask(doneItem.dataset.id, { status: 'todo' });
+      render();
+      return;
+    }
+
     const side = e.target.closest('.side-task');
     if (side) {
       const task = state.unscheduled.find((t) => t.id === side.dataset.id);
@@ -179,6 +208,13 @@ export function initDayScreen(root) {
         await updateTask(task.id, { scheduledDate: state.date, scheduledStart: w.start });
         render();
       }
+      return;
+    }
+
+    const tlDone = e.target.closest('.tl-done');
+    if (tlDone) {
+      await updateTask(tlDone.dataset.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+      render();
       return;
     }
 

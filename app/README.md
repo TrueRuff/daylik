@@ -18,14 +18,17 @@ npm run build   # production-сборка
 app/
 ├── index.html            — точка входа браузера
 ├── src/
-│   ├── main.js           — UI-каркас (ввод → разбор)
-│   ├── core/             — мой блок: алгоритмы и данные
-│   │   ├── models.js     — Sphere, Task, PlanBlock
+│   ├── main.js           — вкладки, экраны, цикл напоминаний
+│   ├── styles.css
+│   ├── core/             — алгоритмы и данные
+│   │   ├── models.js     — Sphere, Task, Practice, PlanBlock
 │   │   ├── storage.js    — IndexedDB через Dexie
 │   │   ├── categorize.js — гибридный разбор ввода (правила → LLM)
-│   │   ├── dayPlan.js    — календарь дня: подбор дел в окна
-│   │   └── reminders.js  — планировщик напоминаний
-│   └── ai/
-│       └── llmClient.js  — заглушка внешнего LLM API
+│   │   ├── dayPlan.js    — таймлайн дня: свободные окна и упаковка дел
+│   │   ├── schedule.js   — время и дни недели
+│   │   └── reminders.js  — напоминания (Notifications API)
+│   ├── ai/
+│   │   └── llmClient.js  — заглушка внешнего LLM API
+│   └── ui/               — экраны: день (таймлайн), сферы, ввод
 └── tests/                — Vitest
 ```

@@ -90,8 +90,38 @@ textarea { resize: vertical; }
 }
 .practice-row .del-practice { background: none; border: none; color: #b23b3b; font-size: 16px; padding: 0 4px; }
 
-.day-row { padding: 6px 0; border-bottom: 1px solid #eee; }
-.time { color: #666; font-variant-numeric: tabular-nums; margin-right: 8px; }
+.task-row { display: flex; gap: 6px; margin: 4px 0; }
+.task-row .side-task, .task-label {
+  flex: 1;
+  text-align: left;
+  background: #fff;
+  color: #222;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+.task-label { color: #777; }
+.done-btn {
+  width: 34px;
+  background: #fff;
+  color: #4e8a3a;
+  border: 1px solid #b5d1a3;
+  border-radius: 6px;
+  font-size: 15px;
+}
+.done-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #999;
+  padding: 4px 2px;
+  font-size: 13px;
+  text-decoration: line-through;
+}
+.tl-done { float: right; color: #2f5222; font-weight: bold; cursor: pointer; }
 
 .day-wrap { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
 .timeline {
@@ -157,12 +187,6 @@ textarea { resize: vertical; }
   padding: 6px 9px;
   margin: 4px 0;
   font-size: 13px;
-}
-.side-postponed {
-  color: #777;
-  font-size: 13px;
-  padding: 4px 2px;
-  border-bottom: 1px dashed #e5e5e0;
 }
 .badge {
   display: inline-block;

@@ -32,8 +32,9 @@ export async function getAllSpheres() {
 
 export async function getTasks({ status = null, group = null } = {}) {
   let col = db.tasks;
-  if (status) col = col.where('status').equals(status);
-  if (group) col = col.and((t) => t.group === group); // Dexie не умеет два where подряд — второе условие фильтруем вручную
+  if (status || group) {
+    col = col.filter((t) => (!status || t.status === status) && (!group || t.group === group));
+  }
   const rows = await col.toArray();
   return rows.map((r) => new Task(r));
 }
@@ -44,6 +45,13 @@ export async function updateTask(id, patch) {
 
 export async function deleteTask(id) {
   await db.tasks.delete(id);
+}
+
+// Задачи с наступившим временем напоминания.
+// Фильтр по месту: в IndexedDB null меньше числа и попал бы в выборку belowThanOrEqual.
+export async function getDueReminders(now) {
+  const rows = await db.tasks.filter((t) => t.dueAt && t.dueAt <= now && t.status !== 'done').toArray();
+  return rows.map((r) => new Task(r));
 }
 
 export async function savePractice(practice) {
