@@ -17,5 +17,5 @@ export async function requestPermission() {
 
 export function fireNotification(task) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  new Notification('Дайлик', { body: task.title, tag: task.id });
+  new Notification('Дейлик', { body: task.title, tag: task.id });
 }

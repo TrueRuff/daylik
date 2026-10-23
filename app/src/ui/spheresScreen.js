@@ -14,6 +14,8 @@ export function initSpheresScreen(root) {
   async function renderList() {
     const spheres = await getAllSpheres();
     root.innerHTML = `
+      <h2>Сферы</h2>
+      <p class="muted">Сфера — направление жизни, а не разовая задача: у неё краткое и полное описание, к ней крепятся регулярные практики и дела.</p>
       <div class="sphere-cols">
         ${['Н', 'Ж', 'П'].map((g) => {
           const list = spheres.filter((s) => s.group === g);

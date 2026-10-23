@@ -22,6 +22,8 @@ export class Task {
     group,
     durationMin = 30,
     status = 'inbox', // inbox | todo | doing | done | postponed
+    scheduledDate = null, // 'YYYY-MM-DD' — день на таймлайне
+    scheduledStart = null, // минуты от 00:00
     dueAt = null,
     repeatRule = null,
     notes = '',

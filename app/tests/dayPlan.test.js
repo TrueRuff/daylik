@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDay, sortCandidates, findFreeWindow } from '../src/core/dayPlan.js';
+import { buildDay, sortCandidates, findFreeWindow, computeFreeWindows } from '../src/core/dayPlan.js';
 import { Task } from '../src/core/models.js';
 
 const task = (id, group, durationMin) =>
@@ -30,6 +30,17 @@ describe('findFreeWindow', () => {
   it('возвращает null, если дело никуда не влезает', () => {
     const blocks = [{ start: 0, end: 1439 }];
     expect(findFreeWindow(blocks, 60)).toBeNull();
+  });
+});
+
+describe('computeFreeWindows', () => {
+  it('находит все свободные промежутки', () => {
+    const w = computeFreeWindows([{ start: 0, end: 480 }, { start: 540, end: 600 }]);
+    expect(w).toEqual([{ start: 480, end: 540 }, { start: 600, end: 1440 }]);
+  });
+
+  it('без блоков весь день свободен', () => {
+    expect(computeFreeWindows([])).toEqual([{ start: 0, end: 1440 }]);
   });
 });
 

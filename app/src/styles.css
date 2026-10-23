@@ -93,9 +93,92 @@ textarea { resize: vertical; }
 .day-row { padding: 6px 0; border-bottom: 1px solid #eee; }
 .time { color: #666; font-variant-numeric: tabular-nums; margin-right: 8px; }
 
+.day-wrap { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
+.timeline {
+  position: relative;
+  height: 1152px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+.tl-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #f0f0ee;
+  font-size: 10px;
+  color: #aaa;
+  padding-left: 4px;
+}
+.tl-block {
+  position: absolute;
+  left: 42px;
+  right: 8px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.tl-routine { background: #d9dde6; color: #2e3440; }
+.tl-task { background: #b5d1a3; color: #1f2c18; cursor: pointer; }
+.tl-task:hover { outline: 2px solid #6a9b52; }
+.tl-window {
+  position: absolute;
+  left: 42px;
+  right: 8px;
+  border: 1px dashed #c9c9c4;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.win-add {
+  background: none;
+  border: 1px solid #ccc;
+  color: #888;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  font-size: 16px;
+  padding: 0;
+}
+.win-add:hover { background: #efefec; color: #333; }
+.tl-now { position: absolute; left: 0; right: 0; border-top: 2px solid #d06565; z-index: 2; }
+.side h3 { font-size: 14px; margin: 10px 0 6px; }
+.side-task, .pick-task {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  color: #222;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px 9px;
+  margin: 4px 0;
+  font-size: 13px;
+}
+.side-postponed {
+  color: #777;
+  font-size: 13px;
+  padding: 4px 2px;
+  border-bottom: 1px dashed #e5e5e0;
+}
+.badge {
+  display: inline-block;
+  background: #eceff4;
+  border: 1px solid #d5dae2;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 0 5px;
+  color: #444;
+  margin-right: 6px;
+}
+
 .days { display: flex; gap: 10px; flex-wrap: wrap; }
 .day { display: inline-flex; gap: 4px; align-items: center; color: #444; margin: 0; }
 
 @media (max-width: 700px) {
   .sphere-cols { grid-template-columns: 1fr; }
+  .day-wrap { grid-template-columns: 1fr; }
 }

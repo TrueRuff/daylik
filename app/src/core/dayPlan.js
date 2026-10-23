@@ -30,6 +30,19 @@ export function findFreeWindow(blocks, durationMin) {
   return null;
 }
 
+// Все свободные промежутки между блоками
+export function computeFreeWindows(blocks) {
+  const sorted = [...blocks].sort((a, b) => a.start - b.start);
+  const out = [];
+  let cursor = 0;
+  for (const b of sorted) {
+    if (b.start - cursor > 0) out.push({ start: cursor, end: b.start });
+    cursor = Math.max(cursor, b.end);
+  }
+  if (MINUTES_IN_DAY - cursor > 0) out.push({ start: cursor, end: MINUTES_IN_DAY });
+  return out;
+}
+
 /**
  * Собирает план дня.
  * @param {string} date 'YYYY-MM-DD'
