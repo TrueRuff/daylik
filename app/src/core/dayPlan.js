@@ -41,7 +41,13 @@ export function buildDay(date, routines, tasks) {
   const blocks = [];
 
   for (const r of routines) {
-    blocks.push(new PlanBlock({ start: r.start, end: r.end, kind: 'routine', label: r.label }));
+    if (r.end <= r.start) {
+      // практика через полночь (например, сон 23:00–07:00) — два блока
+      blocks.push(new PlanBlock({ start: r.start, end: MINUTES_IN_DAY, kind: 'routine', label: r.label }));
+      blocks.push(new PlanBlock({ start: 0, end: r.end, kind: 'routine', label: r.label }));
+    } else {
+      blocks.push(new PlanBlock({ start: r.start, end: r.end, kind: 'routine', label: r.label }));
+    }
   }
 
   // Жадная упаковка: кандидаты по приоритету группы и длительности, каждый — в первое свободное окно

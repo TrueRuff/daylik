@@ -34,6 +34,12 @@ describe('findFreeWindow', () => {
 });
 
 describe('buildDay', () => {
+  it('практика через полночь разбивается на два блока', () => {
+    const plan = buildDay('2026-10-24', [{ start: 1380, end: 420, label: 'Сон' }], []);
+    const routines = plan.blocks.filter((b) => b.kind === 'routine');
+    expect(routines.length).toBe(2); // 23:00–24:00 и 00:00–07:00
+  });
+
   it('раскладывает дела по окнам, невлезающее — postponed', () => {
     const routines = [
       { start: 0, end: 480, label: 'Сон' },

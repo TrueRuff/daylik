@@ -43,6 +43,18 @@ export class Task {
   }
 }
 
+// Регулярная практика сферы (сон, тренировки, пары)
+export class Practice {
+  constructor({ id, sphereId = null, title, days = [1, 2, 3, 4, 5, 6, 7], start = 540, end = 600 }) {
+    this.id = id;
+    this.sphereId = sphereId;
+    this.title = title;
+    this.days = days;   // дни недели 1..7, 1 = понедельник
+    this.start = start; // минуты от 00:00
+    this.end = end;     // может быть меньше start — практика через полночь
+  }
+}
+
 // Блок таймлайна дня
 export class PlanBlock {
   constructor({ id, start, end, kind = 'free', label = null, taskId = null }) {

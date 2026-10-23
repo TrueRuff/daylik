@@ -1,0 +1,28 @@
+// Вспомогательные функции для расписания: время и дни недели
+
+export const DAY_NAMES = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+export function timeToMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function minutesToTime(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Проходит ли практика в указанный день недели (1..7, 1 = понедельник)
+export function practiceAppliesOn(practice, dayOfWeek) {
+  return practice.days.includes(dayOfWeek);
+}
+
+export function formatDays(days) {
+  if (days.length === 7) return 'ежедневно';
+  return days
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => DAY_NAMES[d - 1])
+    .join(', ');
+}

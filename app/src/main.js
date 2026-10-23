@@ -1,25 +1,27 @@
-// Точка входа. UI-каркас: одна строка ввода → разбор гибридным ИИ → показ результата.
-// Полноценные экраны (таймлайн, сферы) — следующий этап.
+// Точка входа: вкладки и экраны
 
-import { categorize } from './core/categorize.js';
-import { saveTask } from './core/storage.js';
-import { Task } from './core/models.js';
+import './styles.css';
+import { initDayScreen } from './ui/dayScreen.js';
+import { initSpheresScreen } from './ui/spheresScreen.js';
+import { initInputScreen } from './ui/inputScreen.js';
 
-const input = document.getElementById('input');
-const button = document.getElementById('parse');
-const result = document.getElementById('result');
+const screens = {
+  day: document.getElementById('tab-day'),
+  spheres: document.getElementById('tab-spheres'),
+  input: document.getElementById('tab-input'),
+};
 
-button.addEventListener('click', async () => {
-  const raw = input.value.trim();
-  if (!raw) return;
+initDayScreen(screens.day);
+initSpheresScreen(screens.spheres);
+initInputScreen(screens.input);
 
-  const parsed = await categorize(raw);
-  result.textContent = JSON.stringify(parsed, null, 2);
+const buttons = document.querySelectorAll('nav button');
 
-  // Пока показываем разбор; сохранение — после подтверждения пользователя (по концепту)
-  if (parsed.kind === 'task') {
-    const task = new Task({ id: crypto.randomUUID(), rawText: raw, ...parsed, source: parsed.provider });
-    await saveTask(task);
-    result.textContent += `\n\nСохранено дело: ${task.title} (группа ${task.group})`;
-  }
-});
+function showTab(name) {
+  for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
+  buttons.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.dispatchEvent(new CustomEvent('tab-shown', { detail: name }));
+}
+
+buttons.forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+showTab('day');

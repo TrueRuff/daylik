@@ -2,13 +2,17 @@
 // Единственная точка доступа к данным — всё остальное работает через этот модуль.
 
 import Dexie from 'dexie';
-import { Sphere, Task } from './models.js';
+import { Sphere, Task, Practice } from './models.js';
 
 const db = new Dexie('daylik');
 
 db.version(1).stores({
   spheres: 'id, name, group',
   tasks: 'id, sphereId, group, status, dueAt',
+});
+
+db.version(2).stores({
+  practices: 'id, sphereId',
 });
 
 export async function saveSphere(sphere) {
@@ -40,4 +44,24 @@ export async function updateTask(id, patch) {
 
 export async function deleteTask(id) {
   await db.tasks.delete(id);
+}
+
+export async function savePractice(practice) {
+  await db.practices.put(practice);
+  return practice;
+}
+
+export async function getPractices() {
+  const rows = await db.practices.toArray();
+  return rows.map((r) => new Practice(r));
+}
+
+export async function deletePractice(id) {
+  await db.practices.delete(id);
+}
+
+// Сфера удаляется вместе со своими практиками
+export async function deleteSphere(id) {
+  await db.spheres.delete(id);
+  await db.practices.where('sphereId').equals(id).delete();
 }

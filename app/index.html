@@ -6,11 +6,17 @@
     <title>Дайлик — планировщик</title>
   </head>
   <body>
-    <h1>Дайлик</h1>
-    <p>Каркас приложения. Экраны (таймлайн, сферы, ввод) будут добавляться по мере разработки.</p>
-    <input id="input" type="text" placeholder="Что нужно сделать? Например: помыть пол" />
-    <button id="parse">Разобрать</button>
-    <pre id="result"></pre>
+    <header><h1>Дайлик</h1></header>
+    <nav>
+      <button data-tab="day">День</button>
+      <button data-tab="spheres">Сферы</button>
+      <button data-tab="input">Ввод</button>
+    </nav>
+    <main>
+      <section id="tab-day" hidden></section>
+      <section id="tab-spheres" hidden></section>
+      <section id="tab-input" hidden></section>
+    </main>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
