@@ -19,6 +19,24 @@ npm run build   # production-сборка
 свой ключ (`openrouter.ai → Keys`) и перезапустить `npm run dev`. По умолчанию
 стоит роутер `openrouter/free` — сам выбирает свободную модель из бесплатных.
 
+## Развёртывание
+
+**Docker** (web-версия за nginx):
+
+```bash
+docker build -t daylik .                      # без ключа LLM (только правила)
+docker build --build-arg VITE_OPENROUTER_API_KEY=<ключ> -t daylik .
+docker run --rm -p 8080:80 daylik             # http://localhost:8080
+# или через compose: docker compose up --build
+```
+
+**GitHub Pages**: workflow `.github/workflows/deploy.yml` (в корне репозитория)
+собирает `app/` и публикует при каждом push в main. В настройках репозитория
+включить Settings → Pages → Source: GitHub Actions.
+
+**Desktop**: `npm run dist:win` → `release/Daylik Setup <версия>.exe`
+(Electron + NSIS). `npm run electron` — запуск без сборки установщика.
+
 ## Структура
 
 ```
