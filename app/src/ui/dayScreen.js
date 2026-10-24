@@ -77,6 +77,9 @@ export function initDayScreen(root) {
           ${windows.map(windowHtml).join('')}
         </div>
         <div class="side">
+          <div class="grp-zones" title="${t('task.dropGroup')}">
+            ${['Н', 'Ж', 'П'].map((g) => `<div class="grp-zone" data-g="${g}">${g} — ${t(`group.${g}`)}</div>`).join('')}
+          </div>
           <h3>${t('day.tasks')}</h3>
           ${unscheduled.length
             ? [...placeable, ...notFitting].map((x) => taskRowHtml(x, fits(x))).join('')
@@ -263,10 +266,19 @@ export function initDayScreen(root) {
     drag.ghost.style.left = `${e.clientX}px`;
     drag.ghost.style.top = `${e.clientY}px`;
 
-    // подсветка окна, куда встанет дело
+    // сначала — зоны смены группы в колонке дел
+    let overGroup = null;
+    root.querySelectorAll('.grp-zone').forEach((zone) => {
+      const r = zone.getBoundingClientRect();
+      const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      zone.classList.toggle('drop-col', over);
+      if (over) overGroup = zone.dataset.g;
+    });
+    drag.dropGroup = overGroup;
+
     const timeline = root.querySelector('#timeline');
-    const inside = timeline && e.clientX >= timeline.getBoundingClientRect().left;
-    const minutes = inside ? pointerToMinutes(timeline, e.clientY, drag.durationMin) : null;
+    const inTimeline = !overGroup && timeline && e.clientX >= timeline.getBoundingClientRect().left;
+    const minutes = inTimeline ? pointerToMinutes(timeline, e.clientY, drag.durationMin) : null;
     const ok = minutes != null && canPlaceAt(occupancyExcept(drag.taskId), minutes, drag.durationMin, drag.taskId);
     drag.dropAt = ok ? minutes : null;
     timeline?.classList.toggle('drop-ok', ok);
@@ -275,16 +287,19 @@ export function initDayScreen(root) {
 
   root.addEventListener('pointerup', async () => {
     if (!drag) return;
-    const { taskId, moved, dropAt, ghost, el } = drag;
+    const { taskId, moved, dropAt, dropGroup, ghost, el } = drag;
     const wasDrag = moved;
     ghost?.remove();
     el.classList.remove('drag-src');
+    root.querySelectorAll('.grp-zone').forEach((z) => z.classList.remove('drop-col'));
     root.querySelector('#timeline')?.classList.remove('drop-ok', 'drop-bad');
     drag = null;
 
     if (!wasDrag) return; // обычный клик — обработает click-слушатель
     suppressClick();
-    if (dropAt != null) {
+    if (dropGroup) {
+      await updateTask(taskId, { group: dropGroup });
+    } else if (dropAt != null) {
       await updateTask(taskId, { scheduledDate: state.date, scheduledStart: dropAt });
     }
     render();
@@ -294,6 +309,7 @@ export function initDayScreen(root) {
     if (!drag) return;
     drag.ghost?.remove();
     drag.el.classList.remove('drag-src');
+    root.querySelectorAll('.grp-zone').forEach((z) => z.classList.remove('drop-col'));
     root.querySelector('#timeline')?.classList.remove('drop-ok', 'drop-bad');
     drag = null;
     suppressClick();

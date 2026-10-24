@@ -48,7 +48,7 @@ export class Task {
   }
 }
 
-// Регулярная практика сферы (сон, тренировки, пары)
+// Регулярная практика направления (сон, тренировки, пары); в интерфейсе Sphere — «Направление»
 export class Practice {
   constructor({ id, sphereId = null, title, days = [1, 2, 3, 4, 5, 6, 7], start = 540, end = 600 }) {
     this.id = id;

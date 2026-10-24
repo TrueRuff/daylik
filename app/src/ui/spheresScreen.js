@@ -1,4 +1,5 @@
-// Экран «Сферы»: три группы Н/Ж/П, карточка сферы с описаниями и практиками
+// Экран «Направления»: три группы Н/Ж/П, карточка направления с описаниями
+// и практиками. Карточку можно перетащить в другую колонку — смена группы.
 
 import { Sphere, Practice } from '../core/models.js';
 import {
@@ -11,25 +12,41 @@ import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/sche
 import { t } from '../core/i18n.js';
 import { escapeHtml, downloadFile } from './dom.js';
 
+const EXAMPLES = [
+  { name: 'Сон', group: 'Н' },
+  { name: 'Дом', group: 'Н' },
+  { name: 'Отдых', group: 'Ж' },
+  { name: 'Учёба', group: 'П' },
+];
+
+const DRAG_THRESHOLD = 6;
+
 export function initSpheresScreen(root) {
+  let drag = null; // перетаскивание карточки между колонками
+
   async function renderList() {
     const spheres = await getAllSpheres();
     const freePractices = (await getPractices()).filter((p) => !p.sphereId);
     root.innerHTML = `
       <h2>${t('spheres.title')}</h2>
       <p class="muted">${t('spheres.intro')}</p>
+      <p class="muted legend">${t('spheres.legend')}</p>
       <div class="sphere-cols">
         ${['Н', 'Ж', 'П'].map((g) => {
           const list = spheres.filter((s) => s.group === g);
           return `
-            <div class="sphere-col">
+            <div class="sphere-col" data-g="${g}">
               <h3>${g} — ${t(`group.${g}`)}</h3>
               ${list.length
-                ? list.map((s) => `<button class="sphere-item" data-id="${s.id}">${escapeHtml(s.name)}</button>`).join('')
+                ? list.map((s) => `<button class="sphere-item" data-id="${s.id}" title="${t('spheres.dragHint')}">${escapeHtml(s.name)}</button>`).join('')
                 : `<p class="muted">${t('spheres.empty')}</p>`}
             </div>`;
         }).join('')}
       </div>
+      ${!spheres.length ? `
+      <p class="muted">${t('spheres.examples')}
+        ${EXAMPLES.map((x) => `<button class="grp example" data-name="${x.name}" data-g="${x.group}">${x.name} · ${x.group}</button>`).join('')}
+      </p>` : ''}
       <p><button id="new-sphere" class="secondary">${t('spheres.new')}</button></p>
       <div id="detail"></div>
       ${freePractices.length ? `
@@ -148,10 +165,82 @@ export function initSpheresScreen(root) {
     ioMessage(t('data.imported'));
   }
 
+  // ---------- перетаскивание карточки направления между колонками ----------
+
+  root.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const item = e.target.closest('.sphere-item');
+    if (!item) return;
+    drag = { el: item, id: item.dataset.id, startX: e.clientX, startY: e.clientY, moved: false, ghost: null, dropG: null };
+    try {
+      item.setPointerCapture(e.pointerId);
+    } catch {
+      // без захвата pointermove всплывает до root
+    }
+  });
+
+  root.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      const ghost = drag.el.cloneNode(true);
+      ghost.className = 'drag-ghost';
+      document.body.appendChild(ghost);
+      drag.ghost = ghost;
+      drag.el.classList.add('drag-src');
+    }
+    drag.ghost.style.left = `${e.clientX}px`;
+    drag.ghost.style.top = `${e.clientY}px`;
+
+    // колонка под курсором — цель для смены группы
+    drag.dropG = null;
+    root.querySelectorAll('.sphere-col').forEach((col) => {
+      const r = col.getBoundingClientRect();
+      const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      col.classList.toggle('drop-col', over);
+      if (over) drag.dropG = col.dataset.g;
+    });
+  });
+
+  let skipClick = false;
+
+  async function finishDrag(cancelled) {
+    if (!drag) return;
+    const { moved, id, dropG, ghost, el } = drag;
+    ghost?.remove();
+    el.classList.remove('drag-src');
+    root.querySelectorAll('.sphere-col').forEach((col) => col.classList.remove('drop-col'));
+    drag = null;
+    if (!moved || cancelled) return;
+    skipClick = true;
+    setTimeout(() => { skipClick = false; }, 50);
+    if (dropG) {
+      const spheres = await getAllSpheres();
+      const sphere = spheres.find((s) => s.id === id);
+      if (sphere && sphere.group !== dropG) {
+        sphere.group = dropG;
+        await saveSphere(sphere);
+      }
+    }
+    await renderList();
+  }
+
+  root.addEventListener('pointerup', () => finishDrag(false));
+  root.addEventListener('pointercancel', () => finishDrag(true));
+
   root.addEventListener('click', async (e) => {
+    if (skipClick) return;
     const item = e.target.closest('.sphere-item');
     if (item) {
       await openDetail(item.dataset.id);
+      return;
+    }
+
+    const example = e.target.closest('.example');
+    if (example) {
+      await saveSphere(new Sphere({ id: crypto.randomUUID(), name: example.dataset.name, group: example.dataset.g }));
+      await renderList();
       return;
     }
 
