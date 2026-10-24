@@ -20,7 +20,7 @@ const screens = {
 initLog();
 
 initDayScreen(screens.day);
-initSpheresScreen(spheres.spheres);
+initSpheresScreen(screens.spheres);
 initInputScreen(screens.input);
 initLogScreen(screens.log);
 
