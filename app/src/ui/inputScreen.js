@@ -5,7 +5,7 @@ import { Task, Sphere, Practice } from '../core/models.js';
 import { saveTask, saveSphere, savePractice, getAllSpheres } from '../core/storage.js';
 import { dayNames, timeToMinutes, localInputToTs } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml } from './dom.js';
+import { escapeHtml, daysCheckboxes } from './dom.js';
 
 function kindTitle(kind) {
   return t(`kind.${kind}`);
@@ -77,9 +77,7 @@ export function initInputScreen(root) {
           <label>${t('common.start')} <input id="c-start" type="time" value="09:00"></label>
           <label>${t('common.end')} <input id="c-end" type="time" value="10:00"></label>
         </div>
-        <div class="days">
-          ${dayNames().map((d, i) => `<label class="day"><input type="checkbox" data-day="${i + 1}" checked>${d}</label>`).join('')}
-        </div>` : ''}
+        <div class="days">${daysCheckboxes()}</div>` : ''}
         ${state.kind === 'task' ? `
         <div class="row">
           <label>${t('task.duration')} <input id="c-dur" type="number" min="5" step="5" value="${parsed.durationMin || 30}"></label>

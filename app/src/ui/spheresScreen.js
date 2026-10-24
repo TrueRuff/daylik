@@ -11,7 +11,7 @@ import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport
 import { toIcs } from '../core/ics.js';
 import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml, downloadFile } from './dom.js';
+import { escapeHtml, downloadFile, daysCheckboxes } from './dom.js';
 
 const EXAMPLES = [
   { name: 'Сон', group: 'Н' },
@@ -102,9 +102,7 @@ export function initSpheresScreen(root) {
           <label>${t('common.start')} <input id="p-start" type="time" value="09:00"></label>
           <label>${t('common.end')} <input id="p-end" type="time" value="10:00"></label>
         </div>
-        <div class="days">
-          ${dayNames().map((d, i) => `<label class="day"><input type="checkbox" data-day="${i + 1}" checked>${d}</label>`).join('')}
-        </div>
+        <div class="days">${daysCheckboxes()}</div>
         <p><button id="add-practice" data-id="${sphere.id}" class="secondary">${t('spheres.addPractice')}</button></p>`}
       </div>`;
   }

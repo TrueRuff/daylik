@@ -1,16 +1,18 @@
 // Экран «День»: таймлайн 00:00–24:00 — рутины, поставленные дела, свободные окна.
 // Расстановка: перетаскиванием (drag'n'drop), кликом в окно или автоматически.
 
-import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask, savePractice, deletePractice } from '../core/storage.js';
-import { practiceAppliesOn, minutesToTime, timeToMinutes, tsToLocalInput, localInputToTs, todayStr, dayNames } from '../core/schedule.js';
+import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask, savePractice, deletePractice, saveTask } from '../core/storage.js';
+import { categorize } from '../core/categorize.js';
+import { breakdownWithLlm } from '../ai/llmClient.js';
+import { practiceAppliesOn, minutesToTime, timeToMinutes, tsToLocalInput, localInputToTs, todayStr, addDays } from '../core/schedule.js';
 import {
   buildDay, computeFreeWindows, canPlaceAt, practicesToBlocks,
   adaptiveSort, autoPlaceLimit, recommendNow,
 } from '../core/dayPlan.js';
 import { dayStats } from '../core/analytics.js';
-import { Practice } from '../core/models.js';
+import { Practice, Task } from '../core/models.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml } from './dom.js';
+import { escapeHtml, daysCheckboxes } from './dom.js';
 
 const PX_PER_MIN = 0.8;
 const DRAG_THRESHOLD = 6; // px, отличаем перетаскивание от клика
@@ -60,7 +62,8 @@ export function initDayScreen(root) {
     const scheduled = todo
       .filter((x) => x.scheduledDate === date)
       .sort((a, b) => a.scheduledStart - b.scheduledStart);
-    const unscheduled = todo.filter((x) => x.scheduledDate !== date);
+    // сегодняшние несобранные: без даты или на сегодня; отложенные на завтра не давят
+    const unscheduled = todo.filter((x) => !x.scheduledDate || x.scheduledDate === date);
 
     const blocks = [
       ...practicesToBlocks(practices).map((r) => ({ ...r, kind: 'routine' })),
@@ -101,6 +104,11 @@ export function initDayScreen(root) {
       </div>
       <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
       ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
+      <div class="input-row">
+        <input id="quick-add" placeholder="${t('day.quickAdd')}">
+        <button id="quick-save" class="secondary">+</button>
+      </div>
+      <p id="quick-msg" class="muted"></p>
       ${overdue.length ? `
       <div class="card overdue-box">
         <span>${t('day.overdue', { n: overdue.length })}</span>
@@ -199,8 +207,14 @@ export function initDayScreen(root) {
         </div>
         <div class="row">
           <button id="e-save" data-id="${task.id}">${t('common.save')}</button>
+          <button id="e-tomorrow" data-id="${task.id}" class="secondary">${t('task.tomorrow')}</button>
           <button id="e-delete" data-id="${task.id}" class="danger">${t('task.deleteBtn')}</button>
         </div>
+        ${task.durationMin >= 60 ? `
+        <div class="row">
+          <button id="e-breakdown" data-id="${task.id}" class="secondary">${t('task.breakdown')}</button>
+          <span id="e-msg" class="muted"></span>
+        </div>` : ''}
       </div>`;
   }
 
@@ -229,12 +243,7 @@ export function initDayScreen(root) {
           <label>${t('common.start')} <input id="r-start" type="time" value="${p ? minutesToTime(p.start) : '23:00'}"></label>
           <label>${t('common.end')} <input id="r-end" type="time" value="${p ? minutesToTime(p.end) : '07:00'}"></label>
         </div>
-        <div class="days">
-          ${dayNames().map((d, i) => {
-            const on = isNew || p.days.includes(i + 1);
-            return `<label class="day"><input type="checkbox" data-day="${i + 1}"${on ? ' checked' : ''}>${d}</label>`;
-          }).join('')}
-        </div>
+        <div class="days">${daysCheckboxes(isNew ? undefined : p.days)}</div>
         <div class="row">
           <button id="routine-save" data-id="${p?.id || ''}">${t('common.save')}</button>
           ${isNew ? '' : `<button id="routine-delete" data-id="${p.id}" class="danger">${t('common.delete')}</button>`}
@@ -514,6 +523,11 @@ export function initDayScreen(root) {
       return;
     }
 
+    if (e.target.closest('#quick-save')) {
+      await quickAdd();
+      return;
+    }
+
     if (e.target.closest('#picker-close')) {
       picker = null;
       render();
@@ -546,6 +560,44 @@ export function initDayScreen(root) {
       await updateTask(x.id, patch);
       editing = null;
       render();
+      return;
+    }
+
+    if (e.target.id === 'e-tomorrow') {
+      const x = state.allTasks.find((y) => y.id === e.target.dataset.id);
+      if (x) await updateTask(x.id, { scheduledDate: addDays(state.date, 1) });
+      editing = null;
+      render();
+      return;
+    }
+
+    if (e.target.id === 'e-breakdown') {
+      const x = state.allTasks.find((y) => y.id === e.target.dataset.id);
+      if (!x) return;
+      const msg = root.querySelector('#e-msg');
+      if (msg) msg.textContent = '…';
+      const steps = await breakdownWithLlm(x.title);
+      if (!steps) {
+        if (msg) msg.textContent = t('task.breakdownFailed');
+        return;
+      }
+      const stepDur = Math.min(30, Math.max(10, Math.round(x.durationMin / steps.length / 5) * 5));
+      for (const step of steps) {
+        await saveTask(new Task({
+          id: crypto.randomUUID(),
+          title: step,
+          group: x.group,
+          sphereId: x.sphereId,
+          durationMin: stepDur,
+          status: 'todo',
+          source: 'llm',
+        }));
+      }
+      await deleteTask(x.id);
+      editing = null;
+      render();
+      const quickMsg = root.querySelector('#quick-msg');
+      if (quickMsg) quickMsg.textContent = t('task.brokenInto', { n: steps.length });
       return;
     }
 
@@ -627,6 +679,36 @@ export function initDayScreen(root) {
       if (wrap) wrap.hidden = e.target.value !== 'every';
     }
   });
+
+  root.addEventListener('keydown', (e) => {
+    if (e.target.id === 'quick-add' && e.key === 'Enter') quickAdd();
+  });
+
+  // Быстрый ввод с экрана дня: тот же гибридный разбор, дело создаётся сразу
+  async function quickAdd() {
+    const input = root.querySelector('#quick-add');
+    const msg = root.querySelector('#quick-msg');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const parsed = await categorize(text);
+    if (parsed.kind !== 'task') {
+      msg.textContent = t('day.quickKindHint');
+      return;
+    }
+    await saveTask(new Task({
+      id: crypto.randomUUID(),
+      rawText: text,
+      title: parsed.title,
+      group: parsed.group || 'Н',
+      durationMin: parsed.durationMin || 30,
+      status: 'todo',
+      source: parsed.provider,
+    }));
+    input.value = '';
+    if (msg) msg.textContent = '';
+    render();
+  }
 
   document.addEventListener('tab-shown', (e) => {
     if (e.detail === 'day') render();

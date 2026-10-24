@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { categorizeWithLlm } from '../src/ai/llmClient.js';
+import { categorizeWithLlm, breakdownWithLlm } from '../src/ai/llmClient.js';
 
 // Ответ OpenRouter: текст модели лежит в choices[0].message.content
 function apiResponse(content) {
@@ -153,5 +153,50 @@ describe('categorizeWithLlm', () => {
 
     const result = await categorizeWithLlm('разобрать шкаф');
     expect(result.durationMin).toBeUndefined();
+  });
+});
+
+describe('breakdownWithLlm — разбиение дела на шаги', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_OPENROUTER_API_KEY', 'test-key');
+    vi.stubEnv('VITE_LLM_MODEL', 'test-model');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('массив строк превращается в шаги', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      apiResponse('["собрать вещи", "протереть полки", "разложить по коробкам"]')
+    ));
+    const steps = await breakdownWithLlm('Разобрать шкаф');
+    expect(steps).toEqual(['собрать вещи', 'протереть полки', 'разложить по коробкам']);
+  });
+
+  it('пояснения вокруг массива и лишние элементы отбрасываются, максимум 6', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      apiResponse('Вот шаги: ["a","b","",7,"c","d","e","f","g"] Удачи!')
+    ));
+    const steps = await breakdownWithLlm('X');
+    expect(steps).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  });
+
+  it('меньше двух валидных шагов → null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(apiResponse('["единственный шаг"]')));
+    expect(await breakdownWithLlm('X')).toBeNull();
+  });
+
+  it('не-массив или мусор → null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(apiResponse('не могу разбить это дело')));
+    expect(await breakdownWithLlm('X')).toBeNull();
+  });
+
+  it('без ключа → null без запроса', async () => {
+    vi.stubEnv('VITE_OPENROUTER_API_KEY', '');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await breakdownWithLlm('X')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

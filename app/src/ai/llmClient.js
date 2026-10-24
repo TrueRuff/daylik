@@ -24,7 +24,7 @@ group — "Н" (быт и насущное), "Ж" (желания и жизнь)
 durationMin — длительность в минутах от 5 до 240, указывай только для task.
 repeatRule — "daily" или "weekly", указывай только для routine.`;
 
-async function sendRequest(apiKey, model, rawText) {
+async function sendRequest(apiKey, model, userText, systemPrompt = SYSTEM_PROMPT) {
   try {
     return await fetch(API_URL, {
       method: 'POST',
@@ -35,8 +35,8 @@ async function sendRequest(apiKey, model, rawText) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: rawText },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userText },
         ],
         temperature: 0,
         // запас на reasoning-токены, иначе у резонеров обрезается сам ответ
@@ -127,4 +127,44 @@ function parseLlmAnswer(text) {
     result.repeatRule = parsed.repeatRule;
   }
   return result;
+}
+
+const BREAKDOWN_PROMPT = `Разбей дело на 3–6 маленьких конкретных шагов, каждый по 10–30 минут.
+Верни строго JSON-массив строк без пояснений: ["шаг 1", "шаг 2", ...]`;
+
+// Разбиение большого дела на шаги (идея из goblin.tools). null — ключа нет,
+// сеть недоступна или модель ответила не массивом
+export async function breakdownWithLlm(title) {
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) return null;
+  const model = import.meta.env.VITE_LLM_MODEL || DEFAULT_MODEL;
+  log.debug('llm.breakdown.request', { model });
+
+  const response = await sendRequest(apiKey, model, title, BREAKDOWN_PROMPT);
+  if (!response || !response.ok) {
+    log.warn('llm.breakdown.failed', { status: response ? response.status : 'network' });
+    return null;
+  }
+  const data = await response.json().catch(() => null);
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string') return null;
+
+  const steps = parseSteps(content);
+  log[steps ? 'info' : 'warn']('llm.breakdown.' + (steps ? 'ok' : 'unparsed'), { chars: content.length });
+  return steps;
+}
+
+function parseSteps(text) {
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start === -1 || end <= start) return null;
+  let arr;
+  try {
+    arr = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(arr)) return null;
+  const steps = arr.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).slice(0, 6);
+  return steps.length >= 2 ? steps : null;
 }
