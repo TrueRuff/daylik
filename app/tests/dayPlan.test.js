@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildDay, sortCandidates, findFreeWindow, computeFreeWindows, canPlaceAt } from '../src/core/dayPlan.js';
+import {
+  buildDay, sortCandidates, adaptiveSort, autoPlaceLimit, recommendNow,
+  findFreeWindow, computeFreeWindows, canPlaceAt,
+} from '../src/core/dayPlan.js';
 import { Task } from '../src/core/models.js';
 
 const task = (id, group, durationMin) =>
@@ -14,6 +17,71 @@ describe('sortCandidates', () => {
       task('d', 'Ж', 40),
     ]);
     expect(sorted.map((t) => t.id)).toEqual(['c', 'b', 'd', 'a']);
+  });
+});
+
+describe('adaptiveSort — стратегия зависит от энергии', () => {
+  const tasks = [
+    task('big-need', 'Н', 120),
+    task('small-want', 'Ж', 15),
+    task('mid-need', 'Н', 45),
+    task('small-useful', 'П', 20),
+  ];
+
+  it('low: лёгкие (<=30 мин) впереди независимо от группы', () => {
+    const ids = adaptiveSort(tasks, 'low').map((t) => t.id);
+    expect(ids.slice(0, 2).sort()).toEqual(['small-useful', 'small-want']);
+    expect(ids).toContain('big-need'); // тяжёлое в конце, но не выброшено
+    expect(ids[ids.length - 1]).toBe('big-need');
+  });
+
+  it('normal: как обычная сортировка', () => {
+    expect(adaptiveSort(tasks, 'normal').map((t) => t.id))
+      .toEqual(sortCandidates(tasks).map((t) => t.id));
+  });
+
+  it('high: внутри группы длинные вперёд', () => {
+    const ids = adaptiveSort(tasks, 'high').map((t) => t.id);
+    expect(ids[0]).toBe('big-need');   // Н-120 раньше Н-45
+    expect(ids.indexOf('mid-need')).toBeLessThan(ids.indexOf('small-useful'));
+  });
+
+  it('autoPlaceLimit: уставшему максимум 3 дела', () => {
+    expect(autoPlaceLimit('low')).toBe(3);
+    expect(autoPlaceLimit('normal')).toBe(Infinity);
+    expect(autoPlaceLimit('high')).toBe(Infinity);
+  });
+});
+
+describe('recommendNow — одна рекомендация под текущий момент', () => {
+  const windows = [{ start: 0, end: 600 }, { start: 780, end: 900 }]; // до 10:00 и 13:00–15:00
+  const tasks = [task('short', 'Ж', 20), task('long', 'Н', 120)];
+
+  it('берёт окно с текущей минутой и дело, влезающее в остаток окна', () => {
+    const rec = recommendNow(windows, tasks, 540, 'normal'); // 9:00, до конца окна 60 минут
+    expect(rec.task.id).toBe('short'); // 120-минутное не влезает, 20-минутное — да
+    expect(rec.start).toBe(540);
+  });
+
+  it('если текущее окно прошло — ближайшее впереди', () => {
+    const rec = recommendNow(windows, tasks, 700, 'normal'); // 11:40 между окнами
+    expect(rec.window.start).toBe(780);
+    expect(rec.start).toBe(780);
+  });
+
+  it('дело длиннее остатка окна не рекомендуется', () => {
+    const only = [task('huge', 'Н', 240)];
+    expect(recommendNow(windows, only, 540, 'normal')).toBeNull();
+  });
+
+  it('окон нет — null', () => {
+    expect(recommendNow([], tasks, 100, 'normal')).toBeNull();
+  });
+
+  it('уставшему рекомендует лёгкое, а не важное длинное', () => {
+    const both = [task('need-long', 'Н', 90), task('want-short', 'Ж', 20)];
+    const rec = recommendNow([{ start: 0, end: 600 }], both, 60, 'low');
+    expect(rec.task.id).toBe('want-short');
   });
 });
 

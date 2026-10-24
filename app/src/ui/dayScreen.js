@@ -3,7 +3,10 @@
 
 import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask } from '../core/storage.js';
 import { practiceAppliesOn, minutesToTime, tsToLocalInput, localInputToTs, todayStr } from '../core/schedule.js';
-import { buildDay, computeFreeWindows, sortCandidates, canPlaceAt, practicesToBlocks } from '../core/dayPlan.js';
+import {
+  buildDay, computeFreeWindows, canPlaceAt, practicesToBlocks,
+  adaptiveSort, autoPlaceLimit, recommendNow,
+} from '../core/dayPlan.js';
 import { dayStats } from '../core/analytics.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml } from './dom.js';
@@ -11,9 +14,26 @@ import { escapeHtml } from './dom.js';
 const PX_PER_MIN = 0.8;
 const DRAG_THRESHOLD = 6; // px, отличаем перетаскивание от клика
 const SNAP_MIN = 5;       // сетка таймлайна, минуты
+const ENERGY_KEY = 'daylik-energy';
 
 function todayWeekday() {
   return ((new Date().getDay() + 6) % 7) + 1; // 1 = понедельник
+}
+
+function loadEnergy() {
+  try {
+    return localStorage.getItem(ENERGY_KEY) || 'normal';
+  } catch {
+    return 'normal';
+  }
+}
+
+function saveEnergy(v) {
+  try {
+    localStorage.setItem(ENERGY_KEY, v);
+  } catch {
+    // сохранение не критично
+  }
 }
 
 export function initDayScreen(root) {
@@ -21,6 +41,8 @@ export function initDayScreen(root) {
   let editing = null; // id редактируемого дела
   let state = null;   // данные текущей отрисовки
   let drag = null;    // активное перетаскивание
+  let energy = loadEnergy();
+  let whatNow = null; // рекомендация «что сейчас»
 
   async function render() {
     const date = todayStr();
@@ -51,8 +73,9 @@ export function initDayScreen(root) {
 
     const windows = computeFreeWindows(blocks);
     const fits = (x) => windows.some((w) => w.end - w.start >= x.durationMin);
-    const placeable = sortCandidates(unscheduled.filter(fits));
+    const placeable = adaptiveSort(unscheduled.filter(fits), energy);
     const notFitting = unscheduled.filter((x) => !fits(x));
+    const overdue = todo.filter((x) => x.scheduledDate && x.scheduledDate < date);
     const isEmpty = !routines.length && !todo.length;
     const stats = dayStats(date, todo, done, practices);
     const fmt = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
@@ -62,10 +85,23 @@ export function initDayScreen(root) {
     root.innerHTML = `
       <div class="row between">
         <h2>${t('day.title')}</h2>
+        <button id="what-now" class="secondary">${t('day.whatNow')}</button>
+      </div>
+      <div class="row between">
+        <span class="muted">${t('energy.label')}:
+          ${['low', 'normal', 'high'].map((e) =>
+            `<button class="grp energy${e === energy ? ' on' : ''}" data-energy="${e}">${t(`energy.${e}`)}</button>`).join('')}
+        </span>
         <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
       </div>
       <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
       ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
+      ${overdue.length ? `
+      <div class="card overdue-box">
+        <span>${t('day.overdue', { n: overdue.length })}</span>
+        <button id="overdue-return" class="secondary">${t('day.overdueReturn')}</button>
+      </div>` : ''}
+      ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}
       ${picker ? pickerHtml(picker, placeable) : ''}
       ${editTask ? editCardHtml(editTask, spheres) : ''}
       <div class="day-wrap">
@@ -203,6 +239,23 @@ export function initDayScreen(root) {
     return d.getHours() * 60 + d.getMinutes();
   }
 
+  function whatNowHtml(rec) {
+    return `
+      <div class="card">
+        <div class="row between">
+          <span>${t('day.whatNowHint', {
+            b: minutesToTime(rec.end),
+            title: rec.task.title,
+            dur: rec.task.durationMin,
+          })}</span>
+          <button id="whatnow-close" class="secondary">${t('common.close')}</button>
+        </div>
+        <div class="row">
+          <button id="whatnow-place" data-id="${rec.task.id}" data-start="${rec.start}">${t('day.whatNowPlace')} ${minutesToTime(rec.start)}</button>
+        </div>
+      </div>`;
+  }
+
   // Занятость дня без указанного дела — для проверки мест при перетаскивании
   function occupancyExcept(taskId) {
     const { routines, scheduled } = state;
@@ -229,7 +282,10 @@ export function initDayScreen(root) {
       ...routines,
       ...scheduled.map((x) => ({ start: x.scheduledStart, end: x.scheduledStart + x.durationMin, label: x.title })),
     ];
-    const plan = buildDay(date, occupancy, unscheduled);
+    // уставшему — ограниченная порция дел, стратегия зависит от уровня энергии
+    const limit = autoPlaceLimit(energy);
+    const batch = adaptiveSort(unscheduled, energy).slice(0, limit);
+    const plan = buildDay(date, occupancy, batch, { sort: (xs) => adaptiveSort(xs, energy) });
     for (const b of plan.blocks.filter((x) => x.kind === 'task')) {
       await updateTask(b.taskId, { scheduledDate: date, scheduledStart: b.start });
     }
@@ -339,6 +395,46 @@ export function initDayScreen(root) {
       await autoPlace();
       return;
     }
+
+    const energyBtn = e.target.closest('[data-energy]');
+    if (energyBtn) {
+      energy = energyBtn.dataset.energy;
+      saveEnergy(energy);
+      whatNow = null;
+      render();
+      return;
+    }
+
+    if (e.target.closest('#what-now')) {
+      const rec = recommendNow(state.windows, state.unscheduled, nowMinutes(), energy);
+      whatNow = rec || 'empty';
+      render();
+      return;
+    }
+
+    if (e.target.closest('#whatnow-close')) {
+      whatNow = null;
+      render();
+      return;
+    }
+
+    const place = e.target.closest('#whatnow-place');
+    if (place) {
+      await updateTask(place.dataset.id, { scheduledDate: state.date, scheduledStart: Number(place.dataset.start) });
+      whatNow = null;
+      render();
+      return;
+    }
+
+    if (e.target.closest('#overdue-return')) {
+      const overdue = state.allTasks.filter((x) => x.status === 'todo' && x.scheduledDate && x.scheduledDate < state.date);
+      for (const x of overdue) {
+        await updateTask(x.id, { scheduledDate: null, scheduledStart: null });
+      }
+      render();
+      return;
+    }
+
     if (e.target.closest('#picker-close')) {
       picker = null;
       render();

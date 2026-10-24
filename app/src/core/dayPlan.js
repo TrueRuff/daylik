@@ -17,6 +17,57 @@ export function sortCandidates(tasks) {
   });
 }
 
+// Уровень энергии пользователя меняет стратегию подбора дел:
+// low — уставшему нужны лёгкие: первыми короткие (<=30 мин), затем важность группы;
+// high — на подъёме берём большие дела: внутри группы длинные вперёд.
+const LIGHT_MAX = 30;
+
+export function adaptiveSort(tasks, energy) {
+  if (energy === 'low') {
+    return [...tasks].sort((a, b) => {
+      const la = a.durationMin <= LIGHT_MAX ? 0 : 1;
+      const lb = b.durationMin <= LIGHT_MAX ? 0 : 1;
+      if (la !== lb) return la - lb;
+      const g = GROUP_PRIORITY[a.group] - GROUP_PRIORITY[b.group];
+      if (g !== 0) return g;
+      return a.durationMin - b.durationMin;
+    });
+  }
+  if (energy === 'high') {
+    return [...tasks].sort((a, b) => {
+      const g = GROUP_PRIORITY[a.group] - GROUP_PRIORITY[b.group];
+      if (g !== 0) return g;
+      return b.durationMin - a.durationMin;
+    });
+  }
+  return sortCandidates(tasks);
+}
+
+// Сколько дел автоукладка ставит за раз: уставшему — не больше трёх,
+// остальное подождёт и не давит
+export function autoPlaceLimit(energy) {
+  return energy === 'low' ? 3 : Infinity;
+}
+
+/**
+ * Одна рекомендация «что сейчас»: свободное окно, содержащее текущую минуту
+ * (или ближайшее впереди), и первое подходящее по длительности и энергии дело.
+ */
+export function recommendNow(windows, tasks, nowMin, energy) {
+  const win = windows.find((w) => nowMin >= w.start && nowMin < w.end)
+    || windows.find((w) => w.start > nowMin);
+  if (!win) return null;
+
+  const from = Math.max(win.start, nowMin);
+  const available = win.end - from;
+  const fitting = adaptiveSort(tasks.filter((x) => x.durationMin <= available), energy);
+  const task = fitting[0];
+  if (!task) return null;
+
+  const start = Math.ceil(from / 5) * 5; // к пятиминутной сетке
+  return { task, start, end: start + task.durationMin, window: win };
+}
+
 // Практики дня в блоки занятости; через полночь (end <= start) разбиваются на два
 export function practicesToBlocks(practices) {
   const out = [];
@@ -64,11 +115,12 @@ export function canPlaceAt(occupancy, start, durationMin, ignoreTaskId = null) {
 /**
  * Собирает план дня.
  * @param {string} date 'YYYY-MM-DD'
- * @param {Array<{start:number,end:number,label:string}>} routines рутины из практик сфер
+ * @param {Array<{start:number,end:number,label:string}>} routines рутины из практик
  * @param {Array<Task>} tasks дела со статусом 'todo'
+ * @param {Object} [opts] { sort } — стратегия сортировки кандидатов (adaptiveSort)
  * @returns {{ date: string, blocks: PlanBlock[] }}
  */
-export function buildDay(date, routines, tasks) {
+export function buildDay(date, routines, tasks, { sort = sortCandidates } = {}) {
   const blocks = [];
 
   for (const r of routines) {
@@ -81,8 +133,8 @@ export function buildDay(date, routines, tasks) {
     }
   }
 
-  // Жадная упаковка: кандидаты по приоритету группы и длительности, каждый — в первое свободное окно
-  const candidates = sortCandidates(tasks);
+  // Жадная упаковка: кандидаты по стратегии сортировки, каждый — в первое свободное окно
+  const candidates = sort(tasks);
   const placedIds = new Set();
 
   for (const task of candidates) {

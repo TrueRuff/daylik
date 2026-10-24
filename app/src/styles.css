@@ -277,3 +277,13 @@ input[type='datetime-local'] {
   padding: 6px 10px;
   font-size: 13px;
 }
+
+.overdue-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-color: #c9a227;
+  background: #fdf6e3;
+}
+.energy { padding: 3px 10px; font-size: 12px; }
