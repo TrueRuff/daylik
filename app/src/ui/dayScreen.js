@@ -1,13 +1,14 @@
 // Экран «День»: таймлайн 00:00–24:00 — рутины, поставленные дела, свободные окна.
 // Расстановка: перетаскиванием (drag'n'drop), кликом в окно или автоматически.
 
-import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask } from '../core/storage.js';
-import { practiceAppliesOn, minutesToTime, tsToLocalInput, localInputToTs, todayStr } from '../core/schedule.js';
+import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask, savePractice, deletePractice } from '../core/storage.js';
+import { practiceAppliesOn, minutesToTime, timeToMinutes, tsToLocalInput, localInputToTs, todayStr, dayNames } from '../core/schedule.js';
 import {
   buildDay, computeFreeWindows, canPlaceAt, practicesToBlocks,
   adaptiveSort, autoPlaceLimit, recommendNow,
 } from '../core/dayPlan.js';
 import { dayStats } from '../core/analytics.js';
+import { Practice } from '../core/models.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml } from './dom.js';
 
@@ -43,11 +44,12 @@ export function initDayScreen(root) {
   let drag = null;    // активное перетаскивание
   let energy = loadEnergy();
   let whatNow = null; // рекомендация «что сейчас»
+  let editPractice = null; // id редактируемого блока дня (рутины)
 
   async function render() {
     const date = todayStr();
     const practices = (await getPractices()).filter((p) => practiceAppliesOn(p, todayWeekday()));
-    const routines = practices.map((p) => ({ start: p.start, end: p.end, label: p.title }));
+    const routines = practices.map((p) => ({ start: p.start, end: p.end, label: p.title, id: p.id }));
 
     const todo = await getTasks({ status: 'todo' });
     const done = (await getTasks({ status: 'done' })).sort((a, b) => b.createdAt - a.createdAt);
@@ -80,7 +82,7 @@ export function initDayScreen(root) {
     const stats = dayStats(date, todo, done, practices);
     const fmt = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
 
-    state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks };
+    state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices };
 
     root.innerHTML = `
       <div class="row between">
@@ -92,7 +94,10 @@ export function initDayScreen(root) {
           ${['low', 'normal', 'high'].map((e) =>
             `<button class="grp energy${e === energy ? ' on' : ''}" data-energy="${e}">${t(`energy.${e}`)}</button>`).join('')}
         </span>
-        <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
+        <span class="row">
+          <button id="add-routine" class="secondary">${t('day.addRoutine')}</button>
+          <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
+        </span>
       </div>
       <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
       ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
@@ -102,6 +107,7 @@ export function initDayScreen(root) {
         <button id="overdue-return" class="secondary">${t('day.overdueReturn')}</button>
       </div>` : ''}
       ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}
+      ${editPractice !== null ? routineEditorHtml(editPractice === 'new' ? null : state.practices.find((p) => p.id === editPractice)) : ''}
       ${picker ? pickerHtml(picker, placeable) : ''}
       ${editTask ? editCardHtml(editTask, spheres) : ''}
       <div class="day-wrap">
@@ -200,11 +206,39 @@ export function initDayScreen(root) {
 
   function blockHtml(b) {
     const height = Math.max((b.end - b.start) * PX_PER_MIN, 16);
-    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"` : '';
+    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"` : ` data-practice="${b.id || ''}" title="${t('routine.edit')}"`;
     const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="${t('task.markDone')}">✓</span>` : '';
     return `
       <div class="tl-block tl-${b.kind}"${attrs} style="top:${b.start * PX_PER_MIN}px;height:${height}px">
         ${minutesToTime(b.start)} ${escapeHtml(b.label)}${done}
+      </div>`;
+  }
+
+  // Карточка блока дня: создание нового или правка существующей рутины
+  function routineEditorHtml(p) {
+    const isNew = !p;
+    return `
+      <div class="card">
+        <div class="row between">
+          <strong>${t('routine.edit')}</strong>
+          <button id="routine-close" class="secondary">${t('common.close')}</button>
+        </div>
+        <p class="muted">${t('routine.hint')}</p>
+        <label>${t('common.title')} <input id="r-title" value="${escapeHtml(p?.title || '')}" placeholder="${t('input.placeholder')}"></label>
+        <div class="row">
+          <label>${t('common.start')} <input id="r-start" type="time" value="${p ? minutesToTime(p.start) : '23:00'}"></label>
+          <label>${t('common.end')} <input id="r-end" type="time" value="${p ? minutesToTime(p.end) : '07:00'}"></label>
+        </div>
+        <div class="days">
+          ${dayNames().map((d, i) => {
+            const on = isNew || p.days.includes(i + 1);
+            return `<label class="day"><input type="checkbox" data-day="${i + 1}"${on ? ' checked' : ''}>${d}</label>`;
+          }).join('')}
+        </div>
+        <div class="row">
+          <button id="routine-save" data-id="${p?.id || ''}">${t('common.save')}</button>
+          ${isNew ? '' : `<button id="routine-delete" data-id="${p.id}" class="danger">${t('common.delete')}</button>`}
+        </div>
       </div>`;
   }
 
@@ -414,6 +448,51 @@ export function initDayScreen(root) {
 
     if (e.target.closest('#whatnow-close')) {
       whatNow = null;
+      render();
+      return;
+    }
+
+    if (e.target.closest('#add-routine')) {
+      editPractice = 'new';
+      render();
+      return;
+    }
+
+    if (e.target.closest('#routine-close')) {
+      editPractice = null;
+      render();
+      return;
+    }
+
+    if (e.target.id === 'routine-save') {
+      const title = root.querySelector('#r-title').value.trim();
+      const days = [...root.querySelectorAll('.days input:checked')].map((c) => Number(c.dataset.day));
+      if (!title || !days.length) return;
+      const old = state.practices.find((p) => p.id === e.target.dataset.id);
+      await savePractice(new Practice({
+        id: e.target.dataset.id || crypto.randomUUID(),
+        sphereId: old?.sphereId ?? null,
+        title,
+        days,
+        start: timeToMinutes(root.querySelector('#r-start').value || '23:00'),
+        end: timeToMinutes(root.querySelector('#r-end').value || '07:00'),
+      }));
+      editPractice = null;
+      render();
+      return;
+    }
+
+    if (e.target.id === 'routine-delete') {
+      await deletePractice(e.target.dataset.id);
+      editPractice = null;
+      render();
+      return;
+    }
+
+    const routineBlock = e.target.closest('.tl-routine');
+    if (routineBlock?.dataset.practice) {
+      editPractice = routineBlock.dataset.practice;
+      routineBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       render();
       return;
     }

@@ -68,15 +68,16 @@ export function recommendNow(windows, tasks, nowMin, energy) {
   return { task, start, end: start + task.durationMin, window: win };
 }
 
-// Практики дня в блоки занятости; через полночь (end <= start) разбиваются на два
+// Практики дня в блоки занятости; через полночь (end <= start) разбивается на два.
+// id практики переносится в блоки — по нему таймлайн открывает редактирование
 export function practicesToBlocks(practices) {
   const out = [];
   for (const p of practices) {
     if (p.end <= p.start) {
-      out.push({ start: p.start, end: MINUTES_IN_DAY, label: p.title });
-      out.push({ start: 0, end: p.end, label: p.title });
+      out.push({ start: p.start, end: MINUTES_IN_DAY, label: p.title, id: p.id });
+      out.push({ start: 0, end: p.end, label: p.title, id: p.id });
     } else {
-      out.push({ start: p.start, end: p.end, label: p.title });
+      out.push({ start: p.start, end: p.end, label: p.title, id: p.id });
     }
   }
   return out;
