@@ -2,7 +2,7 @@
 // формат .daylik (компактный резервный). Плюс normalizeImport — проверка и
 // чистка данных перед записью в базу.
 
-import { Sphere, Task, Practice } from './models.js';
+import { Sphere, Task, Practice, GROUPS } from './models.js';
 
 const FORMAT = 'daylik';
 const FORMAT_VERSION = 1;
@@ -49,6 +49,9 @@ export function parseJson(text) {
   return obj;
 }
 
+const ENCODER = new TextEncoder();
+const DECODER = new TextDecoder();
+
 class Writer {
   constructor() {
     this.chunks = [];
@@ -77,7 +80,7 @@ class Writer {
   }
 
   str(s) {
-    const b = new TextEncoder().encode(String(s ?? ''));
+    const b = ENCODER.encode(String(s ?? ''));
     this.u32(b.length);
     this.push(b);
   }
@@ -117,7 +120,7 @@ class Reader {
 
   str() {
     const len = this.u32();
-    const s = new TextDecoder().decode(new Uint8Array(this.view.buffer, this.offset, len));
+    const s = DECODER.decode(new Uint8Array(this.view.buffer, this.offset, len));
     this.offset += len;
     return s;
   }
@@ -205,13 +208,25 @@ export function parseBinary(buffer) {
 }
 
 // Проверка импортируемых данных: отбрасываем записи без обязательных полей,
-// ссылки на несуществующие сферы обнуляем (сфера могла быть удалена)
+// ссылки на несуществующие сферы обнуляем (сфера могла быть удалена),
+// мусорные числа и группы заменяем безопасными значениями — иначе
+// чужой файл сломал бы таймлайн (NaN в стиле блоков) и сортировку
 export function normalizeImport(obj) {
   const arr = (v) => (Array.isArray(v) ? v : []);
 
+  const safeGroup = (g) => (GROUPS.includes(g) ? g : 'П');
+  const safeInt = (v, fallback, min, max) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
+  };
+
   const spheres = arr(obj?.spheres)
     .filter((s) => s && s.id && s.name)
-    .map((s) => new Sphere(s));
+    .map((s) => {
+      const sphere = new Sphere(s);
+      sphere.group = safeGroup(sphere.group);
+      return sphere;
+    });
   const sphereIds = new Set(spheres.map((s) => s.id));
   const refOrphan = (id) => (id && sphereIds.has(id) ? id : null);
 
@@ -220,6 +235,8 @@ export function normalizeImport(obj) {
     .map((t) => {
       const task = new Task(t);
       task.sphereId = refOrphan(task.sphereId);
+      task.group = safeGroup(task.group);
+      task.durationMin = safeInt(task.durationMin, 30, 5, 240);
       return task;
     });
 
@@ -228,6 +245,8 @@ export function normalizeImport(obj) {
     .map((p) => {
       const practice = new Practice(p);
       practice.sphereId = refOrphan(practice.sphereId);
+      practice.start = safeInt(practice.start, 0, 0, 1440);
+      practice.end = safeInt(practice.end, practice.start || 0, 0, 1440);
       practice.days = (practice.days || []).filter((d) => d >= 1 && d <= 7);
       return practice;
     });

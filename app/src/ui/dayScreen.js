@@ -282,7 +282,7 @@ export function initDayScreen(root) {
 
     const side = e.target.closest('.side-task');
     if (side) {
-      const task = state.unscheduled.find((t) => t.id === side.dataset.id);
+      const task = state.unscheduled.find((x) => x.id === side.dataset.id);
       if (!task) return;
       const w = state.windows.find((w) => w.end - w.start >= task.durationMin);
       if (w) {

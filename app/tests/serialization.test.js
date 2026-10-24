@@ -99,6 +99,30 @@ describe('normalizeImport — проверка импортируемых дан
     expect(restored.practices[0].days).toEqual([2, 5]);
   });
 
+  it('мусорные группы заменяются на П, числа — безопасными значениями', () => {
+    const restored = normalizeImport({
+      spheres: [{ id: 's', name: 'S', group: 'работа' }],
+      tasks: [{ id: 't', title: 'T', group: 42, durationMin: 'много' }],
+      practices: [{ id: 'p', title: 'P', days: [1], start: 'утро', end: 9999 }],
+    });
+    expect(restored.spheres[0].group).toBe('П');
+    expect(restored.tasks[0].group).toBe('П');
+    expect(restored.tasks[0].durationMin).toBe(30);
+    expect(restored.practices[0].start).toBe(0);
+    expect(restored.practices[0].end).toBe(1440);
+  });
+
+  it('длительность дела ограничивается диапазоном 5–240', () => {
+    const restored = normalizeImport({
+      tasks: [
+        { id: 'a', title: 'A', group: 'Н', durationMin: 2 },
+        { id: 'b', title: 'B', group: 'Н', durationMin: 10000 },
+      ],
+    });
+    expect(restored.tasks[0].durationMin).toBe(5);
+    expect(restored.tasks[1].durationMin).toBe(240);
+  });
+
   it('отсутствующие ключи не ломают импорт', () => {
     const restored = normalizeImport({});
     expect(restored).toEqual({ spheres: [], tasks: [], practices: [] });

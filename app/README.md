@@ -42,12 +42,19 @@ docker run --rm -p 8080:80 daylik             # http://localhost:8080
 ```
 app/
 ├── index.html            — точка входа браузера
+├── public/               — PWA: манифест, service worker, иконки
+├── scripts/
+│   └── make-icons.mjs    — генератор PNG-иконок без библиотек
+├── electron/
+│   └── main.cjs          — главный процесс Electron
+├── Dockerfile, nginx.conf, docker-compose.yml — web-версия в контейнере
+├── electron-builder.yml  — сборка установщика Windows (NSIS)
 ├── src/
-│   ├── main.js           — вкладки, экраны, цикл напоминаний
+│   ├── main.js           — вкладки, экраны, напоминания, язык, service worker
 │   ├── styles.css
 │   ├── core/             — алгоритмы и данные
 │   │   ├── models.js     — Sphere, Task, Practice, PlanBlock
-│   │   ├── storage.js    — IndexedDB через Dexie
+│   │   ├── storage.js    — IndexedDB через Dexie (+ таблица журнала)
 │   │   ├── categorize.js — гибридный разбор ввода (правила → LLM)
 │   │   ├── dayPlan.js    — таймлайн дня: свободные окна и упаковка дел
 │   │   ├── schedule.js   — время и дни недели
