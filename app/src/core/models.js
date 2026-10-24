@@ -22,7 +22,7 @@ export class Task {
     title,
     group,
     durationMin = 30,
-    status = 'inbox', // inbox | todo | doing | done | postponed
+    status = 'todo', // todo | done
     scheduledDate = null, // 'YYYY-MM-DD' — день на таймлайне
     scheduledStart = null, // минуты от 00:00
     dueAt = null,

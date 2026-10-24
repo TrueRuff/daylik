@@ -229,3 +229,24 @@ input[type='datetime-local'] {
 .log-debug td:nth-child(2) { color: #888; }
 .log-warn td:nth-child(2) { color: #a06b00; }
 .log-error td:nth-child(2) { color: #b23b3b; }
+
+.task-row.dimmed { opacity: 0.55; }
+.done-box { margin-top: 12px; }
+.done-box summary { font-size: 14px; color: #444; cursor: pointer; margin: 10px 0 6px; }
+.drag-ghost {
+  position: fixed;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #333a45;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+.drag-src { opacity: 0.35; }
+.timeline.drop-ok { outline: 2px solid #4d8a5a; outline-offset: -2px; }
+.timeline.drop-bad { outline: 2px solid #b23b3b; outline-offset: -2px; }
+.tl-task, .side-task { touch-action: none; cursor: grab; }

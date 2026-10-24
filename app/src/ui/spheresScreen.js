@@ -14,6 +14,7 @@ import { escapeHtml, downloadFile } from './dom.js';
 export function initSpheresScreen(root) {
   async function renderList() {
     const spheres = await getAllSpheres();
+    const freePractices = (await getPractices()).filter((p) => !p.sphereId);
     root.innerHTML = `
       <h2>${t('spheres.title')}</h2>
       <p class="muted">${t('spheres.intro')}</p>
@@ -31,6 +32,13 @@ export function initSpheresScreen(root) {
       </div>
       <p><button id="new-sphere" class="secondary">${t('spheres.new')}</button></p>
       <div id="detail"></div>
+      ${freePractices.length ? `
+      <h3>${t('spheres.freePractices')}</h3>
+      ${freePractices.map((p) => `
+        <div class="practice-row">
+          <span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
+          <button class="del-free-practice" data-id="${p.id}" title="${t('common.delete')}">×</button>
+        </div>`).join('')}` : ''}
       <h3>${t('data.title')}</h3>
       <div class="row">
         <button id="export-json" class="secondary">${t('data.exportJson')}</button>
@@ -179,6 +187,12 @@ export function initSpheresScreen(root) {
       await deletePractice(e.target.dataset.id);
       const addBtn = root.querySelector('#add-practice');
       if (addBtn) await openDetail(addBtn.dataset.id);
+      return;
+    }
+
+    if (e.target.classList.contains('del-free-practice')) {
+      await deletePractice(e.target.dataset.id);
+      await renderList();
       return;
     }
 

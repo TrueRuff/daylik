@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDay, sortCandidates, findFreeWindow, computeFreeWindows } from '../src/core/dayPlan.js';
+import { buildDay, sortCandidates, findFreeWindow, computeFreeWindows, canPlaceAt } from '../src/core/dayPlan.js';
 import { Task } from '../src/core/models.js';
 
 const task = (id, group, durationMin) =>
@@ -66,5 +66,37 @@ describe('buildDay', () => {
     const taskBlocks = plan.blocks.filter((b) => b.kind === 'task');
     expect(taskBlocks.length).toBe(2); // 60 + 30 влезли, 600 не влезло
     expect(plan.postponed).toContain('t2');
+  });
+
+  it('buildDay не мутирует входные дела', () => {
+    const tasks = [task('t1', 'Н', 60), task('t2', 'Н', 6000)];
+    buildDay('2026-10-24', [{ start: 0, end: 480, label: 'Сон' }], tasks);
+    expect(tasks.every((x) => x.status === 'todo' || x.status === undefined)).toBe(true);
+  });
+});
+
+describe('canPlaceAt — проверка места при перетаскивании', () => {
+  const occ = [
+    { start: 0, end: 480 },                    // сон
+    { start: 540, end: 600, taskId: 'other' }, // чужое дело 9:00–10:00
+  ];
+
+  it('влезает в свободное окно', () => {
+    expect(canPlaceAt(occ, 480, 60)).toBe(true);   // 8:00–9:00
+    expect(canPlaceAt(occ, 600, 120)).toBe(true);  // после 10:00
+  });
+
+  it('не влезает при пересечении', () => {
+    expect(canPlaceAt(occ, 570, 60)).toBe(false);  // заезжает на чужое 9:30–10:30
+    expect(canPlaceAt(occ, 460, 60)).toBe(false);  // заезжает на сон
+  });
+
+  it('за границей дня — нельзя', () => {
+    expect(canPlaceAt(occ, 1420, 60)).toBe(false); // конец после 24:00
+    expect(canPlaceAt(occ, -10, 30)).toBe(false);
+  });
+
+  it('свой блок не мешает (перемещение самого дела)', () => {
+    expect(canPlaceAt(occ, 540, 60, 'other')).toBe(true);
   });
 });
