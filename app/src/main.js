@@ -78,3 +78,10 @@ startReminderLoop(
 );
 
 log.info('app.start', { lang: getLang() });
+
+// PWA: service worker ставим только в браузере (http/https), Electron работает с file://
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('./sw.js').catch((err) => {
+    log.warn('sw.registerFailed', { message: err?.message });
+  });
+}
