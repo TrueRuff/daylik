@@ -59,11 +59,14 @@ export function initDayScreen(root) {
     const allTasks = [...todo, ...done];
     const editTask = editing ? allTasks.find((x) => x.id === editing) : null;
     if (editing && !editTask) editing = null;
+    // запланированное = дата + конкретное время; отложенное «на завтра» без
+    // времени завтра вернётся в колонку дел, а не сломает таймлайн
     const scheduled = todo
-      .filter((x) => x.scheduledDate === date)
+      .filter((x) => x.scheduledDate === date && x.scheduledStart != null)
       .sort((a, b) => a.scheduledStart - b.scheduledStart);
-    // сегодняшние несобранные: без даты или на сегодня; отложенные на завтра не давят
-    const unscheduled = todo.filter((x) => !x.scheduledDate || x.scheduledDate === date);
+    // сегодняшняя колонка дел: без даты или «на сегодня без времени»;
+    // завтрашние не давят, вчерашние живут в баннере хвостов
+    const unscheduled = todo.filter((x) => !x.scheduledDate || (x.scheduledDate === date && x.scheduledStart == null));
 
     const blocks = [
       ...practicesToBlocks(practices).map((r) => ({ ...r, kind: 'routine' })),
@@ -299,12 +302,13 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // Занятость дня без указанного дела — для проверки мест при перетаскивании
+  // Занятость дня без указанного дела — для проверки мест при перетаскивании.
+  // Рутины через practicesToBlocks: полночная практика разбита, иначе canPlaceAt
+  // пропустит дело на 23:30 поверх сна
   function occupancyExcept(taskId) {
-    const { routines, scheduled } = state;
     return [
-      ...routines,
-      ...scheduled
+      ...practicesToBlocks(state.practices),
+      ...state.scheduled
         .filter((x) => x.id !== taskId)
         .map((x) => ({ start: x.scheduledStart, end: x.scheduledStart + x.durationMin, taskId: x.id })),
     ];
@@ -332,6 +336,7 @@ export function initDayScreen(root) {
     for (const b of plan.blocks.filter((x) => x.kind === 'task')) {
       await updateTask(b.taskId, { scheduledDate: date, scheduledStart: b.start });
     }
+    whatNow = null;
     render();
   }
 
@@ -406,6 +411,7 @@ export function initDayScreen(root) {
 
     if (!wasDrag) return; // обычный клик — обработает click-слушатель
     suppressClick();
+    whatNow = null; // рекомендация устарела: расписание только что изменилось
     if (dropGroup) {
       await updateTask(taskId, { group: dropGroup });
     } else if (dropAt != null) {
@@ -620,6 +626,7 @@ export function initDayScreen(root) {
     if (pick) {
       await updateTask(pick.dataset.id, { scheduledDate: state.date, scheduledStart: Number(pick.dataset.start) });
       picker = null;
+      whatNow = null;
       render();
       return;
     }
@@ -653,6 +660,7 @@ export function initDayScreen(root) {
       const w = state.windows.find((x) => x.end - x.start >= task.durationMin);
       if (w) {
         await updateTask(task.id, { scheduledDate: state.date, scheduledStart: w.start });
+        whatNow = null;
         render();
       }
       return;

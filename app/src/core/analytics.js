@@ -16,7 +16,7 @@ export function dayStats(date, todo, done, practices) {
   const wd = weekdayOf(date);
   const routines = practicesToBlocks(practices.filter((p) => practiceAppliesOn(p, wd)));
 
-  const scheduled = todo.filter((x) => x.scheduledDate === date);
+  const scheduled = todo.filter((x) => x.scheduledDate === date && x.scheduledStart != null);
   const blocks = [
     ...routines,
     ...scheduled.map((x) => ({ start: x.scheduledStart, end: x.scheduledStart + x.durationMin })),
@@ -25,10 +25,10 @@ export function dayStats(date, todo, done, practices) {
 
   const plannedMin = scheduled.reduce((s, x) => s + x.durationMin, 0);
   const doneMin = done.reduce((s, x) => s + x.durationMin, 0);
-  const remainingMin = todo
-    .filter((x) => x.scheduledDate !== date)
-    .reduce((s, x) => s + x.durationMin, 0);
-  // перегруз: неразобранных дел больше, чем свободного времени
+  // перегруз — только сегодняшняя гора: бездатные и «сегодня без времени»;
+  // отложенные на завтра и хвосты прошлых дней сюда не входят
+  const today = todo.filter((x) => !x.scheduledDate || (x.scheduledDate === date && x.scheduledStart == null));
+  const remainingMin = today.reduce((s, x) => s + x.durationMin, 0);
   const overloadMin = Math.max(0, remainingMin - freeMin);
 
   return {
