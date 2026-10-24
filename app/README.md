@@ -33,9 +33,10 @@ app/
 │   │   ├── categorize.js — гибридный разбор ввода (правила → LLM)
 │   │   ├── dayPlan.js    — таймлайн дня: свободные окна и упаковка дел
 │   │   ├── schedule.js   — время и дни недели
-│   │   └── reminders.js  — напоминания (Notifications API)
+│   │   ├── reminders.js  — напоминания (Notifications API)
+│   │   └── serialization.js — экспорт/импорт: JSON и двоичный формат .daylik
 │   ├── ai/
-│   │   └── llmClient.js  — заглушка внешнего LLM API
+│   │   └── llmClient.js  — клиент OpenRouter с деградацией на правила
 │   └── ui/               — экраны: день (таймлайн), сферы, ввод
 └── tests/                — Vitest
 ```

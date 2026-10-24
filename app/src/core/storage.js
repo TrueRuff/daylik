@@ -3,6 +3,7 @@
 
 import Dexie from 'dexie';
 import { Sphere, Task, Practice } from './models.js';
+import { normalizeImport } from './serialization.js';
 
 const db = new Dexie('daylik');
 
@@ -72,4 +73,27 @@ export async function deletePractice(id) {
 export async function deleteSphere(id) {
   await db.spheres.delete(id);
   await db.practices.where('sphereId').equals(id).delete();
+}
+
+// Экспорт/импорт всех данных (см. serialization.js)
+export async function exportAll() {
+  return {
+    spheres: await db.spheres.toArray(),
+    tasks: await db.tasks.toArray(),
+    practices: await db.practices.toArray(),
+  };
+}
+
+// Импорт с полной заменой текущих данных; возвращает очищенные записи
+export async function importAll(data) {
+  const clean = normalizeImport(data);
+  await db.transaction('rw', db.spheres, db.tasks, db.practices, async () => {
+    await db.spheres.clear();
+    await db.tasks.clear();
+    await db.practices.clear();
+    await db.spheres.bulkAdd(clean.spheres);
+    await db.tasks.bulkAdd(clean.tasks);
+    await db.practices.bulkAdd(clean.practices);
+  });
+  return clean;
 }

@@ -4,9 +4,11 @@ import { Sphere, Practice, GROUP_TITLES } from '../core/models.js';
 import {
   getAllSpheres, saveSphere, deleteSphere,
   getPractices, savePractice, deletePractice,
+  exportAll, importAll,
 } from '../core/storage.js';
+import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
 import { DAY_NAMES, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
-import { escapeHtml } from './dom.js';
+import { escapeHtml, downloadFile } from './dom.js';
 
 export function initSpheresScreen(root) {
   async function renderList() {
@@ -27,7 +29,15 @@ export function initSpheresScreen(root) {
         }).join('')}
       </div>
       <p><button id="new-sphere" class="secondary">Новая сфера</button></p>
-      <div id="detail"></div>`;
+      <div id="detail"></div>
+      <h3>Данные</h3>
+      <div class="row">
+        <button id="export-json" class="secondary">Экспорт JSON</button>
+        <button id="export-bin" class="secondary">Резервная копия (.daylik)</button>
+        <button id="import-data" class="secondary">Импорт</button>
+        <input id="import-file" type="file" accept=".json,.daylik" hidden>
+      </div>
+      <p id="io-msg" class="muted"></p>`;
   }
 
   function formHtml(sphere, practices, isNew) {
@@ -87,6 +97,47 @@ export function initSpheresScreen(root) {
     detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  function ioMessage(text) {
+    const el = root.querySelector('#io-msg');
+    if (el) el.textContent = text;
+  }
+
+  async function exportBackup(binary) {
+    const data = await exportAll();
+    const date = new Date().toISOString().slice(0, 10);
+    if (binary) {
+      downloadFile(`daylik-${date}.daylik`, new Blob([serializeBinary(data)]));
+    } else {
+      downloadFile(`daylik-${date}.json`, new Blob([serializeJson(data)], { type: 'application/json' }));
+    }
+    ioMessage('Файл сохранён.');
+  }
+
+  // Файл читаем всегда как байты и различаем по сигнатуре DAYL
+  async function importFile(file) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const isBinary = bytes.length >= 4 && [68, 65, 89, 76].every((b, i) => bytes[i] === b);
+    const data = isBinary
+      ? parseBinary(bytes.buffer)
+      : parseJson(new TextDecoder().decode(bytes));
+    if (!data) {
+      ioMessage('Не удалось прочитать файл: формат не распознан.');
+      return;
+    }
+
+    const clean = normalizeImport(data);
+    const ok = confirm(
+      `Файл: ${clean.spheres.length} сфер, ${clean.tasks.length} дел, ${clean.practices.length} практик.\n`
+      + 'Текущие данные будут заменены. Продолжить?'
+    );
+    if (!ok) return;
+
+    await importAll(data);
+    await renderList();
+    document.dispatchEvent(new CustomEvent('tab-shown', { detail: 'day' }));
+    ioMessage('Данные импортированы.');
+  }
+
   root.addEventListener('click', async (e) => {
     const item = e.target.closest('.sphere-item');
     if (item) {
@@ -129,6 +180,19 @@ export function initSpheresScreen(root) {
       return;
     }
 
+    if (e.target.id === 'export-json') {
+      await exportBackup(false);
+      return;
+    }
+    if (e.target.id === 'export-bin') {
+      await exportBackup(true);
+      return;
+    }
+    if (e.target.id === 'import-data') {
+      root.querySelector('#import-file').click();
+      return;
+    }
+
     if (e.target.id === 'add-practice') {
       const title = root.querySelector('#p-title').value.trim();
       const days = [...root.querySelectorAll('.days input:checked')].map((c) => Number(c.dataset.day));
@@ -143,6 +207,13 @@ export function initSpheresScreen(root) {
       });
       await savePractice(practice);
       await openDetail(practice.sphereId);
+    }
+  });
+
+  root.addEventListener('change', (e) => {
+    if (e.target.id === 'import-file' && e.target.files.length) {
+      importFile(e.target.files[0]);
+      e.target.value = ''; // тот же файл можно выбрать повторно
     }
   });
 

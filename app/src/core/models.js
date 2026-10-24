@@ -39,6 +39,8 @@ export class Task {
     this.group = group;
     this.durationMin = durationMin;
     this.status = status;
+    this.scheduledDate = scheduledDate;
+    this.scheduledStart = scheduledStart;
     this.dueAt = dueAt;
     this.repeatRule = repeatRule;
     this.notes = notes;

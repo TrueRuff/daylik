@@ -35,6 +35,69 @@ describe('categorizeByRules', () => {
   });
 });
 
+describe('длительность в тексте', () => {
+  it('«позвонить маме на 20 минут» → 20 мин, из названия вычищено', () => {
+    const r = categorizeByRules('позвонить маме на 20 минут');
+    expect(r.durationMin).toBe(20);
+    expect(r.title).toBe('позвонить маме');
+  });
+
+  it('«сделать курсач за 2 часа» → 120 мин', () => {
+    const r = categorizeByRules('сделать курсач за 2 часа');
+    expect(r.durationMin).toBe(120);
+    expect(r.title).toBe('сделать курсач');
+  });
+
+  it('«полчаса» и «полтора часа» → 30 и 90', () => {
+    const r1 = categorizeByRules('разобрать ящик с проводами, полчаса');
+    expect(r1.durationMin).toBe(30);
+    const r2 = categorizeByRules('разобрать ящик с проводами, полтора часа');
+    expect(r2.durationMin).toBe(90);
+  });
+
+  it('незнакомый глагол, но длительность явная → она сохраняется в фолбэке', () => {
+    const r = categorizeByRules('пересобрать кота на 40 минут');
+    expect(r.confidence).toBeLessThan(0.5);
+    expect(r.durationMin).toBe(40);
+    expect(r.title).toBe('пересобрать кота');
+  });
+});
+
+describe('расширенный словарь', () => {
+  it('«медитировать по вечерам» → ежедневная практика', () => {
+    const r = categorizeByRules('медитировать по вечерам');
+    expect(r.kind).toBe('routine');
+    expect(r.repeatRule).toBe('daily');
+    expect(r.title).toBe('медитировать');
+  });
+
+  it('«тренироваться каждую неделю» → недельная практика', () => {
+    const r = categorizeByRules('тренироваться каждую неделю');
+    expect(r.kind).toBe('routine');
+    expect(r.repeatRule).toBe('weekly');
+    expect(r.title).toBe('тренироваться');
+  });
+
+  it('«бассейн по субботам» → недельная практика', () => {
+    const r = categorizeByRules('бассейн по субботам');
+    expect(r.kind).toBe('routine');
+    expect(r.repeatRule).toBe('weekly');
+    expect(r.title).toBe('бассейн');
+  });
+
+  it('«хочу выучить японский» → сфера', () => {
+    const r = categorizeByRules('хочу выучить японский');
+    expect(r.kind).toBe('sphere');
+    expect(r.title).toBe('японский');
+  });
+
+  it('«приготовить ужин» → дело Н', () => {
+    const r = categorizeByRules('приготовить ужин');
+    expect(r.kind).toBe('task');
+    expect(r.group).toBe('Н');
+  });
+});
+
 describe('categorize — гибрид правил и LLM', () => {
   beforeEach(() => {
     vi.clearAllMocks();
