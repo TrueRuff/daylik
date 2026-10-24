@@ -119,6 +119,22 @@ describe('categorizeWithLlm', () => {
     expect(await categorizeWithLlm('что-то')).toBeNull();
   });
 
+  it('несколько JSON-объектов подряд → берётся первый', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      apiResponse('{"kind": "task", "title": "Приготовить еду", "group": "Н", "durationMin": 60} {"kind": "routine", "title": "Готовить", "group": "П", "repeatRule": "daily"}')
+    ));
+
+    const result = await categorizeWithLlm('надо поесть и научиться готовить');
+    expect(result).toEqual({
+      kind: 'task',
+      title: 'Приготовить еду',
+      group: 'Н',
+      durationMin: 60,
+      confidence: 0.6,
+      provider: 'llm',
+    });
+  });
+
   it('незнакомая группа → group null, остальное сохранено', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       apiResponse('{"kind":"task","title":"Позвонить маме","group":"семья","durationMin":15}')

@@ -7,6 +7,8 @@ const REQUEST_TIMEOUT_MS = 20000;
 const RETRY_DELAY_MS = 2000;
 // У бесплатных моделей общий пул: 429/5xx часто уходит за секунды — пробуем ещё раз
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+// openrouter/free — роутер: сам выбирает свободную модель из бесплатных
+const DEFAULT_MODEL = 'openrouter/free';
 
 const KINDS = new Set(['task', 'routine', 'sphere']);
 const GROUPS = new Set(['Н', 'Ж', 'П']);
@@ -35,7 +37,9 @@ async function sendRequest(apiKey, model, rawText) {
           { role: 'user', content: rawText },
         ],
         temperature: 0,
-        max_tokens: 200,
+        // запас на reasoning-токены, иначе у резонеров обрезается сам ответ
+        max_tokens: 1000,
+        reasoning: { exclude: true },
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -52,7 +56,7 @@ export async function categorizeWithLlm(rawText) {
   const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
   if (!apiKey) return null;
 
-  const model = import.meta.env.VITE_LLM_MODEL || 'google/gemma-4-31b-it:free';
+  const model = import.meta.env.VITE_LLM_MODEL || DEFAULT_MODEL;
 
   let response = await sendRequest(apiKey, model, rawText);
   if (response && RETRYABLE_STATUS.has(response.status)) {
@@ -68,15 +72,26 @@ export async function categorizeWithLlm(rawText) {
   return parseLlmAnswer(content);
 }
 
-// Модели обрамляют JSON пояснениями или ```-блоками — берём текст между первой { и последней }
-function parseLlmAnswer(text) {
+// Модели обрамляют JSON пояснениями или ```-блоками, иногда выдают несколько
+// объектов подряд — берём первый сбалансированный {...}
+function extractFirstJson(text) {
   const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
+function parseLlmAnswer(text) {
+  const json = extractFirstJson(text);
+  if (!json) return null;
 
   let parsed;
   try {
-    parsed = JSON.parse(text.slice(start, end + 1));
+    parsed = JSON.parse(json);
   } catch {
     return null;
   }
