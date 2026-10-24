@@ -1,8 +1,7 @@
 // Модели данных (см. проектирование.md, раздел 2)
 
 export const GROUPS = ['Н', 'Ж', 'П']; // Необходимо / Желательно / Полезно
-
-export const GROUP_TITLES = { 'Н': 'Необходимо', 'Ж': 'Желательно', 'П': 'Полезно' };
+// названия групп — в словаре локализации (i18n.js), ключи group.Н / group.Ж / group.П
 
 export class Sphere {
   constructor({ id, name, group, brief = '', details = '', createdAt = Date.now() }) {

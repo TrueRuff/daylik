@@ -1,6 +1,11 @@
 // Вспомогательные функции для расписания: время и дни недели
 
-export const DAY_NAMES = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+import { t } from './i18n.js';
+
+// Названия дней — из словаря локализации (см. i18n.js), ключи 0..6
+export function dayNames() {
+  return t('dayNames');
+}
 
 export function timeToMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -19,11 +24,12 @@ export function practiceAppliesOn(practice, dayOfWeek) {
 }
 
 export function formatDays(days) {
-  if (days.length === 7) return 'ежедневно';
+  if (days.length === 7) return t('schedule.daily');
+  const names = t('dayNames');
   return days
     .slice()
     .sort((a, b) => a - b)
-    .map((d) => DAY_NAMES[d - 1])
+    .map((d) => names[d - 1])
     .join(', ');
 }
 

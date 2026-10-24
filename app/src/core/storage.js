@@ -4,6 +4,7 @@
 import Dexie from 'dexie';
 import { Sphere, Task, Practice } from './models.js';
 import { normalizeImport } from './serialization.js';
+import { log, setSink, LEVELS } from './log.js';
 
 const db = new Dexie('daylik');
 
@@ -14,6 +15,10 @@ db.version(1).stores({
 
 db.version(2).stores({
   practices: 'id, sphereId',
+});
+
+db.version(3).stores({
+  logs: '++id, time, level',
 });
 
 export async function saveSphere(sphere) {
@@ -77,11 +82,13 @@ export async function deleteSphere(id) {
 
 // Экспорт/импорт всех данных (см. serialization.js)
 export async function exportAll() {
-  return {
+  const data = {
     spheres: await db.spheres.toArray(),
     tasks: await db.tasks.toArray(),
     practices: await db.practices.toArray(),
   };
+  log.info('storage.export', { spheres: data.spheres.length, tasks: data.tasks.length, practices: data.practices.length });
+  return data;
 }
 
 // Импорт с полной заменой текущих данных; возвращает очищенные записи
@@ -95,5 +102,35 @@ export async function importAll(data) {
     await db.tasks.bulkAdd(clean.tasks);
     await db.practices.bulkAdd(clean.practices);
   });
+  log.info('storage.import', { spheres: clean.spheres.length, tasks: clean.tasks.length, practices: clean.practices.length });
   return clean;
+}
+
+// Журнал: записи пишутся в таблицу logs, хвост длиннее LOG_CAP подрезается
+const LOG_CAP = 1000;
+
+export function initLog() {
+  setSink(async (entry) => {
+    await db.logs.add(entry);
+    const count = await db.logs.count();
+    if (count > LOG_CAP) {
+      const excess = await db.logs.orderBy('id').limit(count - LOG_CAP).primaryKeys();
+      await db.logs.bulkDelete(excess);
+    }
+  });
+}
+
+// Последние записи журнала из базы (переживают перезапуск), сначала новые
+export async function getLogs({ limit = 200, minLevel = null } = {}) {
+  let rows = await db.logs.orderBy('time').reverse().limit(1000).toArray();
+  if (minLevel) {
+    const min = LEVELS[minLevel] ?? 0;
+    rows = rows.filter((r) => (LEVELS[r.level] ?? 0) >= min);
+  }
+  return rows.slice(0, limit);
+}
+
+export async function clearLogs() {
+  await db.logs.clear();
+  log.info('log.cleared');
 }

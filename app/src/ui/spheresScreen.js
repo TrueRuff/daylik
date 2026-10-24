@@ -1,40 +1,41 @@
 // Экран «Сферы»: три группы Н/Ж/П, карточка сферы с описаниями и практиками
 
-import { Sphere, Practice, GROUP_TITLES } from '../core/models.js';
+import { Sphere, Practice } from '../core/models.js';
 import {
   getAllSpheres, saveSphere, deleteSphere,
   getPractices, savePractice, deletePractice,
   exportAll, importAll,
 } from '../core/storage.js';
 import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
-import { DAY_NAMES, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
+import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
+import { t } from '../core/i18n.js';
 import { escapeHtml, downloadFile } from './dom.js';
 
 export function initSpheresScreen(root) {
   async function renderList() {
     const spheres = await getAllSpheres();
     root.innerHTML = `
-      <h2>Сферы</h2>
-      <p class="muted">Сфера — направление жизни, а не разовая задача: у неё краткое и полное описание, к ней крепятся регулярные практики и дела.</p>
+      <h2>${t('spheres.title')}</h2>
+      <p class="muted">${t('spheres.intro')}</p>
       <div class="sphere-cols">
         ${['Н', 'Ж', 'П'].map((g) => {
           const list = spheres.filter((s) => s.group === g);
           return `
             <div class="sphere-col">
-              <h3>${g} — ${GROUP_TITLES[g]}</h3>
+              <h3>${g} — ${t(`group.${g}`)}</h3>
               ${list.length
                 ? list.map((s) => `<button class="sphere-item" data-id="${s.id}">${escapeHtml(s.name)}</button>`).join('')
-                : '<p class="muted">пусто</p>'}
+                : `<p class="muted">${t('spheres.empty')}</p>`}
             </div>`;
         }).join('')}
       </div>
-      <p><button id="new-sphere" class="secondary">Новая сфера</button></p>
+      <p><button id="new-sphere" class="secondary">${t('spheres.new')}</button></p>
       <div id="detail"></div>
-      <h3>Данные</h3>
+      <h3>${t('data.title')}</h3>
       <div class="row">
-        <button id="export-json" class="secondary">Экспорт JSON</button>
-        <button id="export-bin" class="secondary">Резервная копия (.daylik)</button>
-        <button id="import-data" class="secondary">Импорт</button>
+        <button id="export-json" class="secondary">${t('data.exportJson')}</button>
+        <button id="export-bin" class="secondary">${t('data.exportBin')}</button>
+        <button id="import-data" class="secondary">${t('data.import')}</button>
         <input id="import-file" type="file" accept=".json,.daylik" hidden>
       </div>
       <p id="io-msg" class="muted"></p>`;
@@ -43,41 +44,41 @@ export function initSpheresScreen(root) {
   function formHtml(sphere, practices, isNew) {
     return `
       <div class="card">
-        <h3>${isNew ? 'Новая сфера' : escapeHtml(sphere.name)}</h3>
-        <label>Название <input id="s-name" value="${escapeHtml(sphere.name)}"></label>
-        <label>Группа
+        <h3>${isNew ? t('spheres.new') : escapeHtml(sphere.name)}</h3>
+        <label>${t('common.title')} <input id="s-name" value="${escapeHtml(sphere.name)}"></label>
+        <label>${t('common.group')}
           <select id="s-group">
             ${['Н', 'Ж', 'П'].map((g) =>
-              `<option value="${g}"${g === sphere.group ? ' selected' : ''}>${g} — ${GROUP_TITLES[g]}</option>`).join('')}
+              `<option value="${g}"${g === sphere.group ? ' selected' : ''}>${g} — ${t(`group.${g}`)}</option>`).join('')}
           </select>
         </label>
-        <label>Кратко (перечитывать каждый день)
+        <label>${t('spheres.briefLabel')}
           <textarea id="s-brief" rows="2">${escapeHtml(sphere.brief)}</textarea>
         </label>
-        <label>Полностью (методы, рутина)
+        <label>${t('spheres.detailsLabel')}
           <textarea id="s-details" rows="4">${escapeHtml(sphere.details)}</textarea>
         </label>
         <div class="row">
-          <button id="save-sphere" data-id="${sphere.id}">Сохранить</button>
-          ${isNew ? '' : `<button id="del-sphere" data-id="${sphere.id}" class="danger">Удалить сферу</button>`}
+          <button id="save-sphere" data-id="${sphere.id}">${t('common.save')}</button>
+          ${isNew ? '' : `<button id="del-sphere" data-id="${sphere.id}" class="danger">${t('spheres.deleteBtn')}</button>`}
         </div>
 
         ${isNew ? '' : `
-        <h4>Практики</h4>
+        <h4>${t('spheres.practices')}</h4>
         ${practices.length ? practices.map((p) => `
           <div class="practice-row">
             <span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
-            <button class="del-practice" data-id="${p.id}" title="Удалить">×</button>
-          </div>`).join('') : '<p class="muted">практик пока нет</p>'}
-        <label>Новая практика <input id="p-title" placeholder="например: тренировка"></label>
+            <button class="del-practice" data-id="${p.id}" title="${t('common.delete')}">×</button>
+          </div>`).join('') : `<p class="muted">${t('spheres.noPractices')}</p>`}
+        <label>${t('spheres.newPractice')} <input id="p-title" placeholder="${t('input.placeholder')}"></label>
         <div class="row">
-          <label>Начало <input id="p-start" type="time" value="09:00"></label>
-          <label>Конец <input id="p-end" type="time" value="10:00"></label>
+          <label>${t('common.start')} <input id="p-start" type="time" value="09:00"></label>
+          <label>${t('common.end')} <input id="p-end" type="time" value="10:00"></label>
         </div>
         <div class="days">
-          ${DAY_NAMES.map((d, i) => `<label class="day"><input type="checkbox" data-day="${i + 1}" checked>${d}</label>`).join('')}
+          ${dayNames().map((d, i) => `<label class="day"><input type="checkbox" data-day="${i + 1}" checked>${d}</label>`).join('')}
         </div>
-        <p><button id="add-practice" data-id="${sphere.id}" class="secondary">Добавить практику</button></p>`}
+        <p><button id="add-practice" data-id="${sphere.id}" class="secondary">${t('spheres.addPractice')}</button></p>`}
       </div>`;
   }
 
@@ -110,7 +111,7 @@ export function initSpheresScreen(root) {
     } else {
       downloadFile(`daylik-${date}.json`, new Blob([serializeJson(data)], { type: 'application/json' }));
     }
-    ioMessage('Файл сохранён.');
+    ioMessage(t('data.saved'));
   }
 
   // Файл читаем всегда как байты и различаем по сигнатуре DAYL
@@ -121,21 +122,22 @@ export function initSpheresScreen(root) {
       ? parseBinary(bytes.buffer)
       : parseJson(new TextDecoder().decode(bytes));
     if (!data) {
-      ioMessage('Не удалось прочитать файл: формат не распознан.');
+      ioMessage(t('data.unreadable'));
       return;
     }
 
     const clean = normalizeImport(data);
-    const ok = confirm(
-      `Файл: ${clean.spheres.length} сфер, ${clean.tasks.length} дел, ${clean.practices.length} практик.\n`
-      + 'Текущие данные будут заменены. Продолжить?'
-    );
+    const ok = confirm(t('data.confirm', {
+      s: clean.spheres.length,
+      t: clean.tasks.length,
+      p: clean.practices.length,
+    }));
     if (!ok) return;
 
     await importAll(data);
     await renderList();
     document.dispatchEvent(new CustomEvent('tab-shown', { detail: 'day' }));
-    ioMessage('Данные импортированы.');
+    ioMessage(t('data.imported'));
   }
 
   root.addEventListener('click', async (e) => {

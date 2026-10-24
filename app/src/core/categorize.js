@@ -3,6 +3,7 @@
 // Контракт: categorize(rawText) → { kind, title, group, durationMin?, repeatRule?, confidence, provider }
 
 import { categorizeWithLlm } from '../ai/llmClient.js';
+import { log } from './log.js';
 
 // Длительность в тексте: «на 20 минут», «за 2 часа», «полчаса», «полтора часа».
 // \b в JS не знает кириллицы, поэтому конец слова — lookahead (?![а-яё]).
@@ -100,8 +101,9 @@ export async function categorize(rawText) {
   try {
     const llmResult = await categorizeWithLlm(rawText);
     if (llmResult) return llmResult;
-  } catch {
-    // деградация, а не отказ
+  } catch (err) {
+    log.error('categorize.llmThrew', { message: err?.message });
   }
+  log.info('categorize.fallback', { rawText });
   return { ...rulesResult, llmFailed: true };
 }

@@ -1,6 +1,9 @@
 // Планировщик напоминаний (обязательная функция темы).
 // Каркас: проверка раз в минуту, при наступлении времени — Notifications API.
 
+import { log } from './log.js';
+import { t } from './i18n.js';
+
 export function startReminderLoop(getDueReminders, onFire, intervalMs = 60_000) {
   const tick = async () => {
     const due = await getDueReminders(Date.now());
@@ -17,5 +20,6 @@ export async function requestPermission() {
 
 export function fireNotification(task) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  new Notification('Дейлик', { body: task.title, tag: task.id });
+  log.info('reminder.fired', { title: task.title });
+  new Notification(t('app.name'), { body: task.title, tag: task.id });
 }

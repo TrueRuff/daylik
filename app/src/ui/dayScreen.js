@@ -3,7 +3,7 @@
 import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres } from '../core/storage.js';
 import { practiceAppliesOn, minutesToTime, tsToLocalInput, localInputToTs } from '../core/schedule.js';
 import { buildDay, computeFreeWindows, sortCandidates } from '../core/dayPlan.js';
-import { GROUP_TITLES } from '../core/models.js';
+import { t } from '../core/i18n.js';
 import { escapeHtml } from './dom.js';
 
 const PX_PER_MIN = 0.8;
@@ -58,8 +58,8 @@ export function initDayScreen(root) {
 
     root.innerHTML = `
       <div class="row between">
-        <h2>Сегодня</h2>
-        <button id="auto-place" class="secondary">Разложить автоматически</button>
+        <h2>${t('day.title')}</h2>
+        <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
       </div>
       ${picker ? pickerHtml(picker, placeable) : ''}
       ${editTask ? editCardHtml(editTask, spheres) : ''}
@@ -71,21 +71,21 @@ export function initDayScreen(root) {
           ${windows.map(windowHtml).join('')}
         </div>
         <div class="side">
-          <h3>Дела</h3>
+          <h3>${t('day.tasks')}</h3>
           ${placeable.length
-            ? placeable.map((t) => taskRowHtml(t, true)).join('')
-            : '<p class="muted">нет свободных дел</p>'}
-          <h3>На потом</h3>
+            ? placeable.map((task) => taskRowHtml(task, true)).join('')
+            : `<p class="muted">${t('day.noTasks')}</p>`}
+          <h3>${t('day.postponed')}</h3>
           ${postponed.length
-            ? postponed.map((t) => taskRowHtml(t, false)).join('')
-            : '<p class="muted">всё помещается</p>'}
-          <h3>Сделано</h3>
+            ? postponed.map((task) => taskRowHtml(task, false)).join('')
+            : `<p class="muted">${t('day.fitsAll')}</p>`}
+          <h3>${t('day.done')}</h3>
           ${done.length
-            ? done.slice(0, 10).map((t) => `
-              <button class="done-item" data-id="${t.id}" title="Вернуть в дела">
-                <span class="badge">${t.group}</span>${escapeHtml(t.title)}
+            ? done.slice(0, 10).map((task) => `
+              <button class="done-item" data-id="${task.id}" title="${t('task.return')}">
+                <span class="badge">${task.group}</span>${escapeHtml(task.title)}
               </button>`).join('')
-            : '<p class="muted">пока ничего</p>'}
+            : `<p class="muted">${t('day.nothingDone')}</p>`}
         </div>
       </div>`;
   }
@@ -99,55 +99,55 @@ export function initDayScreen(root) {
     return html;
   }
 
-  function taskRowHtml(t, placeable) {
+  function taskRowHtml(task, placeable) {
     const label = `
-      <span class="badge">${t.group}</span>${escapeHtml(t.title)} <span class="muted">${t.durationMin} мин</span>`;
+      <span class="badge">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}</span>`;
     return `
       <div class="task-row">
         ${placeable
-          ? `<button class="side-task" data-id="${t.id}" title="Поставить в первое подходящее окно">${label}</button>`
+          ? `<button class="side-task" data-id="${task.id}" title="${t('task.putFirst')}">${label}</button>`
           : `<span class="task-label">${label}</span>`}
-        <button class="edit-btn" data-id="${t.id}" title="Редактировать">✎</button>
-        <button class="done-btn" data-id="${t.id}" title="Отметить сделанным">✓</button>
+        <button class="edit-btn" data-id="${task.id}" title="${t('task.editTip')}">✎</button>
+        <button class="done-btn" data-id="${task.id}" title="${t('task.markDone')}">✓</button>
       </div>`;
   }
 
-  function editCardHtml(t, spheres) {
+  function editCardHtml(task, spheres) {
     return `
       <div class="card">
         <div class="row between">
-          <strong>Редактирование дела</strong>
-          <button id="edit-close" class="secondary">Закрыть</button>
+          <strong>${t('task.edit')}</strong>
+          <button id="edit-close" class="secondary">${t('common.close')}</button>
         </div>
-        <label>Название <input id="e-title" value="${escapeHtml(t.title)}"></label>
+        <label>${t('common.title')} <input id="e-title" value="${escapeHtml(task.title)}"></label>
         <div class="row">
-          <label>Длительность, мин <input id="e-dur" type="number" min="5" step="5" value="${t.durationMin}"></label>
-          <label>Группа
+          <label>${t('task.duration')} <input id="e-dur" type="number" min="5" step="5" value="${task.durationMin}"></label>
+          <label>${t('common.group')}
             <select id="e-group">
               ${['Н', 'Ж', 'П'].map((g) =>
-                `<option value="${g}"${g === t.group ? ' selected' : ''}>${g} — ${GROUP_TITLES[g]}</option>`).join('')}
+                `<option value="${g}"${g === task.group ? ' selected' : ''}>${g} — ${t(`group.${g}`)}</option>`).join('')}
             </select>
           </label>
         </div>
-        <label>Сфера
+        <label>${t('common.sphere')}
           <select id="e-sphere">
-            <option value="">без сферы</option>
+            <option value="">${t('task.noSphere')}</option>
             ${spheres.map((s) =>
-              `<option value="${s.id}"${s.id === t.sphereId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+              `<option value="${s.id}"${s.id === task.sphereId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
           </select>
         </label>
-        <label>Напомнить <input id="e-remind" type="datetime-local" value="${tsToLocalInput(t.dueAt)}"></label>
+        <label>${t('task.remind')} <input id="e-remind" type="datetime-local" value="${tsToLocalInput(task.dueAt)}"></label>
         <div class="row">
-          <button id="e-save" data-id="${t.id}">Сохранить</button>
-          <button id="e-delete" data-id="${t.id}" class="danger">Удалить дело</button>
+          <button id="e-save" data-id="${task.id}">${t('common.save')}</button>
+          <button id="e-delete" data-id="${task.id}" class="danger">${t('task.deleteBtn')}</button>
         </div>
       </div>`;
   }
 
   function blockHtml(b) {
     const height = Math.max((b.end - b.start) * PX_PER_MIN, 16);
-    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="Клик — убрать из дня"` : '';
-    const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="Сделано">✓</span>` : '';
+    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"` : '';
+    const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="${t('task.markDone')}">✓</span>` : '';
     return `
       <div class="tl-block tl-${b.kind}"${attrs} style="top:${b.start * PX_PER_MIN}px;height:${height}px">
         ${minutesToTime(b.start)} ${escapeHtml(b.label)}${done}
@@ -159,24 +159,24 @@ export function initDayScreen(root) {
     return `
       <div class="tl-window" style="top:${w.start * PX_PER_MIN}px;height:${height}px">
         <button class="win-add" data-start="${w.start}" data-end="${w.end}"
-          title="Положить дело в окно ${minutesToTime(w.start)}–${minutesToTime(w.end)}">+</button>
+          title="${t('task.putInto', { a: minutesToTime(w.start), b: minutesToTime(w.end) })}">+</button>
       </div>`;
   }
 
   function pickerHtml(w, list) {
-    const fitting = list.filter((t) => t.durationMin <= w.end - w.start);
+    const fitting = list.filter((task) => task.durationMin <= w.end - w.start);
     return `
       <div class="card">
         <div class="row between">
-          <strong>Окно ${minutesToTime(w.start)}–${minutesToTime(w.end)}</strong>
-          <button id="picker-close" class="secondary">Закрыть</button>
+          <strong>${t('day.window')} ${minutesToTime(w.start)}–${minutesToTime(w.end)}</strong>
+          <button id="picker-close" class="secondary">${t('common.close')}</button>
         </div>
         ${fitting.length
-          ? fitting.map((t) => `
-            <button class="pick-task" data-id="${t.id}" data-start="${w.start}">
-              <span class="badge">${t.group}</span>${escapeHtml(t.title)} <span class="muted">${t.durationMin} мин</span>
+          ? fitting.map((task) => `
+            <button class="pick-task" data-id="${task.id}" data-start="${w.start}">
+              <span class="badge">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}</span>
             </button>`).join('')
-          : '<p class="muted">Подходящих дел нет — все длиннее окна.</p>'}
+          : `<p class="muted">${t('picker.noFit')}</p>`}
       </div>`;
   }
 

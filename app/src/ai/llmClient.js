@@ -2,6 +2,8 @@
 // Ключ и модель берутся из .env (VITE_OPENROUTER_API_KEY, VITE_LLM_MODEL, см. .env.example).
 // Любая ошибка — нет ключа, сеть, HTTP, неожиданный ответ — даёт null: разбор падает на правила.
 
+import { log } from '../core/log.js';
+
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const REQUEST_TIMEOUT_MS = 20000;
 const RETRY_DELAY_MS = 2000;
@@ -57,19 +59,32 @@ export async function categorizeWithLlm(rawText) {
   if (!apiKey) return null;
 
   const model = import.meta.env.VITE_LLM_MODEL || DEFAULT_MODEL;
+  log.debug('llm.request', { model, textLength: rawText.length });
 
   let response = await sendRequest(apiKey, model, rawText);
   if (response && RETRYABLE_STATUS.has(response.status)) {
+    log.warn('llm.retryable', { status: response.status });
     await delay(RETRY_DELAY_MS);
     response = await sendRequest(apiKey, model, rawText);
   }
-  if (!response || !response.ok) return null;
+  if (!response || !response.ok) {
+    log.warn('llm.failed', { status: response ? response.status : 'network' });
+    return null;
+  }
 
   const data = await response.json().catch(() => null);
   const content = data?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string') return null;
+  if (typeof content !== 'string') {
+    log.warn('llm.badResponse', { hasContent: false });
+    return null;
+  }
 
-  return parseLlmAnswer(content);
+  const result = parseLlmAnswer(content);
+  log[result ? 'info' : 'warn'](result ? 'llm.parsed' : 'llm.unparsed', {
+    model: data?.model,
+    chars: content.length,
+  });
+  return result;
 }
 
 // Модели обрамляют JSON пояснениями или ```-блоками, иногда выдают несколько
