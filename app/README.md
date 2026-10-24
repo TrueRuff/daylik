@@ -30,6 +30,15 @@ docker run --rm -p 8080:80 daylik             # http://localhost:8080
 # или через compose: docker compose up --build
 ```
 
+Если Docker Hub недоступен (Беларусь), базовые образы через зеркало:
+
+```bash
+docker pull docker.m.daocloud.io/library/node:22-alpine
+docker tag  docker.m.daocloud.io/library/node:22-alpine node:22-alpine
+docker pull docker.m.daocloud.io/library/nginx:alpine
+docker tag  docker.m.daocloud.io/library/nginx:alpine nginx:alpine
+```
+
 **GitHub Pages**: workflow `.github/workflows/deploy.yml` (в корне репозитория)
 собирает `app/` и публикует при каждом push в main. В настройках репозитория
 включить Settings → Pages → Source: GitHub Actions.
