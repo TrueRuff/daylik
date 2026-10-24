@@ -1,20 +1,16 @@
 // Экран «День»: таймлайн 00:00–24:00 — рутины, поставленные дела, свободные окна.
 // Расстановка: перетаскиванием (drag'n'drop), кликом в окно или автоматически.
 
-import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres } from '../core/storage.js';
-import { practiceAppliesOn, minutesToTime, tsToLocalInput, localInputToTs } from '../core/schedule.js';
-import { buildDay, computeFreeWindows, sortCandidates, canPlaceAt } from '../core/dayPlan.js';
+import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask } from '../core/storage.js';
+import { practiceAppliesOn, minutesToTime, tsToLocalInput, localInputToTs, todayStr } from '../core/schedule.js';
+import { buildDay, computeFreeWindows, sortCandidates, canPlaceAt, practicesToBlocks } from '../core/dayPlan.js';
+import { dayStats } from '../core/analytics.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml } from './dom.js';
 
 const PX_PER_MIN = 0.8;
 const DRAG_THRESHOLD = 6; // px, отличаем перетаскивание от клика
 const SNAP_MIN = 5;       // сетка таймлайна, минуты
-
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function todayWeekday() {
   return ((new Date().getDay() + 6) % 7) + 1; // 1 = понедельник
@@ -43,7 +39,7 @@ export function initDayScreen(root) {
     const unscheduled = todo.filter((x) => x.scheduledDate !== date);
 
     const blocks = [
-      ...routines.map((r) => ({ ...r, kind: 'routine' })),
+      ...practicesToBlocks(practices).map((r) => ({ ...r, kind: 'routine' })),
       ...scheduled.map((x) => ({
         start: x.scheduledStart,
         end: x.scheduledStart + x.durationMin,
@@ -58,6 +54,8 @@ export function initDayScreen(root) {
     const placeable = sortCandidates(unscheduled.filter(fits));
     const notFitting = unscheduled.filter((x) => !fits(x));
     const isEmpty = !routines.length && !todo.length;
+    const stats = dayStats(date, todo, done, practices);
+    const fmt = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
 
     state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks };
 
@@ -66,7 +64,8 @@ export function initDayScreen(root) {
         <h2>${t('day.title')}</h2>
         <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
       </div>
-      ${isEmpty ? `<p class="muted">${t('day.emptyHint')}</p>` : `<p class="muted">${t('day.dragHint')}</p>`}
+      <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
+      ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
       ${picker ? pickerHtml(picker, placeable) : ''}
       ${editTask ? editCardHtml(editTask, spheres) : ''}
       <div class="day-wrap">
@@ -145,6 +144,17 @@ export function initDayScreen(root) {
           </select>
         </label>
         <label>${t('task.remind')} <input id="e-remind" type="datetime-local" value="${tsToLocalInput(task.dueAt)}"></label>
+        <div class="row">
+          <label>${t('repeat.label')}
+            <select id="e-repeat">
+              <option value="">${t('repeat.none')}</option>
+              <option value="daily"${task.repeatRule === 'daily' ? ' selected' : ''}>${t('repeat.daily')}</option>
+              <option value="weekly"${task.repeatRule === 'weekly' ? ' selected' : ''}>${t('repeat.weekly')}</option>
+              <option value="every"${/^every:/.test(task.repeatRule || '') ? ' selected' : ''}>${t('repeat.every')}</option>
+            </select>
+          </label>
+          <label id="e-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="e-repeat-n" type="number" min="2" max="30" value="${(/^every:(\d+)/.exec(task.repeatRule || '') || [])[1] || 3}"></label>
+        </div>
         <div class="row">
           <button id="e-save" data-id="${task.id}">${t('common.save')}</button>
           <button id="e-delete" data-id="${task.id}" class="danger">${t('task.deleteBtn')}</button>
@@ -342,12 +352,15 @@ export function initDayScreen(root) {
 
     if (e.target.id === 'e-save') {
       const x = state.allTasks.find((y) => y.id === e.target.dataset.id);
+      const repeatKind = root.querySelector('#e-repeat').value;
+      const repeatN = Number(root.querySelector('#e-repeat-n')?.value) || 3;
       const patch = {
         title: root.querySelector('#e-title').value.trim(),
         durationMin: Number(root.querySelector('#e-dur').value) || 30,
         group: root.querySelector('#e-group').value,
         sphereId: root.querySelector('#e-sphere').value || null,
         dueAt: localInputToTs(root.querySelector('#e-remind').value),
+        repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
       };
       if (!patch.title) return;
       // при смене длительности место на таймлайне могло перестать подходить
@@ -393,7 +406,8 @@ export function initDayScreen(root) {
 
     const doneBtn = e.target.closest('.done-btn');
     if (doneBtn) {
-      await updateTask(doneBtn.dataset.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+      const task = state.allTasks.find((x) => x.id === doneBtn.dataset.id);
+      if (task) await completeTask(task);
       render();
       return;
     }
@@ -419,7 +433,8 @@ export function initDayScreen(root) {
 
     const tlDone = e.target.closest('.tl-done');
     if (tlDone) {
-      await updateTask(tlDone.dataset.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+      const task = state.allTasks.find((x) => x.id === tlDone.dataset.id);
+      if (task) await completeTask(task);
       render();
       return;
     }
@@ -428,6 +443,13 @@ export function initDayScreen(root) {
     if (taskBlock && taskBlock.dataset.id) {
       await updateTask(taskBlock.dataset.id, { scheduledDate: null, scheduledStart: null });
       render();
+    }
+  });
+
+  root.addEventListener('change', (e) => {
+    if (e.target.id === 'e-repeat') {
+      const wrap = root.querySelector('#e-repeat-n-wrap');
+      if (wrap) wrap.hidden = e.target.value !== 'every';
     }
   });
 

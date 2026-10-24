@@ -5,6 +5,7 @@ import Dexie from 'dexie';
 import { Sphere, Task, Practice } from './models.js';
 import { normalizeImport } from './serialization.js';
 import { log, setSink, LEVELS } from './log.js';
+import { nextOccurrence } from './recurring.js';
 
 const db = new Dexie('daylik');
 
@@ -51,6 +52,27 @@ export async function updateTask(id, patch) {
 
 export async function deleteTask(id) {
   await db.tasks.delete(id);
+}
+
+// Завершение дела: обычное — просто done; повторяющееся — done + создаётся
+// следующее вхождение (та же длительность/группа/повтор, место в расписании —
+// на следующую дату). Возвращает созданное вхождение или null.
+export async function completeTask(task) {
+  await updateTask(task.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+  const patch = nextOccurrence(task);
+  if (!patch) return null;
+
+  const next = new Task({
+    ...task,
+    id: crypto.randomUUID(),
+    status: 'todo',
+    createdAt: Date.now(),
+    dueAt: null,
+    ...patch,
+  });
+  await db.tasks.put(next);
+  log.info('task.recurring.next', { title: next.title, rule: next.repeatRule, date: next.scheduledDate });
+  return next;
 }
 
 // Задачи с наступившим временем напоминания.
@@ -104,6 +126,14 @@ export async function importAll(data) {
   });
   log.info('storage.import', { spheres: clean.spheres.length, tasks: clean.tasks.length, practices: clean.practices.length });
   return clean;
+}
+
+// Тестовая утилита: полная очистка таблиц (используется только из storage.test.js)
+export async function __clearForTests() {
+  await db.spheres.clear();
+  await db.tasks.clear();
+  await db.practices.clear();
+  await db.logs.clear();
 }
 
 // Журнал: записи пишутся в таблицу logs, хвост длиннее LOG_CAP подрезается

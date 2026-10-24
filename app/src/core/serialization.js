@@ -3,6 +3,7 @@
 // чистка данных перед записью в базу.
 
 import { Sphere, Task, Practice, GROUPS } from './models.js';
+import { isRepeatRule } from './recurring.js';
 
 const FORMAT = 'daylik';
 const FORMAT_VERSION = 1;
@@ -237,6 +238,7 @@ export function normalizeImport(obj) {
       task.sphereId = refOrphan(task.sphereId);
       task.group = safeGroup(task.group);
       task.durationMin = safeInt(task.durationMin, 30, 5, 240);
+      if (!isRepeatRule(task.repeatRule)) task.repeatRule = null;
       return task;
     });
 

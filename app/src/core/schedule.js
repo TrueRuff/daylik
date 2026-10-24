@@ -45,3 +45,22 @@ export function tsToLocalInput(ts) {
 export function localInputToTs(val) {
   return val ? new Date(val).getTime() : null;
 }
+
+// Сегодняшняя дата 'YYYY-MM-DD' в локальном времени
+export function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// 'YYYY-MM-DD' + n дней -> 'YYYY-MM-DD' (локально, без таймзонных сдвигов)
+export function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+// День недели даты 'YYYY-MM-DD': 1 = понедельник .. 7 = воскресенье
+export function weekdayOf(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return ((new Date(y, m - 1, d).getDay() + 6) % 7) + 1;
+}

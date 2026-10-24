@@ -8,6 +8,7 @@ import {
   exportAll, importAll,
 } from '../core/storage.js';
 import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
+import { toIcs } from '../core/ics.js';
 import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml, downloadFile } from './dom.js';
@@ -60,6 +61,7 @@ export function initSpheresScreen(root) {
       <div class="row">
         <button id="export-json" class="secondary">${t('data.exportJson')}</button>
         <button id="export-bin" class="secondary">${t('data.exportBin')}</button>
+        <button id="export-ics" class="secondary">${t('data.exportIcs')}</button>
         <button id="import-data" class="secondary">${t('data.import')}</button>
         <input id="import-file" type="file" accept=".json,.daylik" hidden>
       </div>
@@ -136,6 +138,12 @@ export function initSpheresScreen(root) {
     } else {
       downloadFile(`daylik-${date}.json`, new Blob([serializeJson(data)], { type: 'application/json' }));
     }
+    ioMessage(t('data.saved'));
+  }
+
+  async function exportCalendar() {
+    const tasks = (await getTasks()).filter((x) => x.scheduledDate);
+    downloadFile('daylik.ics', new Blob([toIcs(tasks)], { type: 'text/calendar' }));
     ioMessage(t('data.saved'));
   }
 
@@ -291,6 +299,10 @@ export function initSpheresScreen(root) {
     }
     if (e.target.id === 'export-bin') {
       await exportBackup(true);
+      return;
+    }
+    if (e.target.id === 'export-ics') {
+      await exportCalendar();
       return;
     }
     if (e.target.id === 'import-data') {

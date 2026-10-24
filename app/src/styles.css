@@ -268,3 +268,12 @@ input[type='datetime-local'] {
 }
 .sphere-item { touch-action: none; cursor: grab; }
 .example { font-size: 12px; padding: 4px 10px; }
+
+.overload {
+  background: #fdecec;
+  border: 1px solid #d9a0a0;
+  color: #7c2d2d;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+}

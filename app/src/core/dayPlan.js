@@ -17,6 +17,20 @@ export function sortCandidates(tasks) {
   });
 }
 
+// Практики дня в блоки занятости; через полночь (end <= start) разбиваются на два
+export function practicesToBlocks(practices) {
+  const out = [];
+  for (const p of practices) {
+    if (p.end <= p.start) {
+      out.push({ start: p.start, end: MINUTES_IN_DAY, label: p.title });
+      out.push({ start: 0, end: p.end, label: p.title });
+    } else {
+      out.push({ start: p.start, end: p.end, label: p.title });
+    }
+  }
+  return out;
+}
+
 // Все свободные промежутки между блоками
 export function computeFreeWindows(blocks) {
   const sorted = [...blocks].sort((a, b) => a.start - b.start);

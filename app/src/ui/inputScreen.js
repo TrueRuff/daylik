@@ -85,6 +85,17 @@ export function initInputScreen(root) {
           <label>${t('task.duration')} <input id="c-dur" type="number" min="5" step="5" value="${parsed.durationMin || 30}"></label>
           <label>${t('task.remindOptional')} <input id="c-remind" type="datetime-local"></label>
         </div>
+        <div class="row">
+          <label>${t('repeat.label')}
+            <select id="c-repeat">
+              <option value="">${t('repeat.none')}</option>
+              <option value="daily">${t('repeat.daily')}</option>
+              <option value="weekly">${t('repeat.weekly')}</option>
+              <option value="every">${t('repeat.every')}</option>
+            </select>
+          </label>
+          <label id="c-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="c-repeat-n" type="number" min="2" max="30" value="3"></label>
+        </div>
         <label>${t('common.sphere')}
           <select id="c-sphere">
             <option value="">${t('task.noSphere')}</option>
@@ -133,6 +144,8 @@ export function initInputScreen(root) {
       const dur = Number(confirmEl.querySelector('#c-dur').value) || 30;
       const remind = confirmEl.querySelector('#c-remind').value;
       const sphereId = confirmEl.querySelector('#c-sphere').value || null;
+      const repeatKind = confirmEl.querySelector('#c-repeat').value;
+      const repeatN = Number(confirmEl.querySelector('#c-repeat-n')?.value) || 3;
       await saveTask(new Task({
         id,
         rawText,
@@ -143,8 +156,16 @@ export function initInputScreen(root) {
         dueAt: localInputToTs(remind),
         status: 'todo',
         source: state.parsed.provider,
+        repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
       }));
       saved(t('task.saved', { title, group: state.group }) + (remind ? ` ${t('task.willRemind')}` : ''));
+    }
+  });
+
+  root.addEventListener('change', (e) => {
+    if (e.target.id === 'c-repeat') {
+      const wrap = root.querySelector('#c-repeat-n-wrap');
+      if (wrap) wrap.hidden = e.target.value !== 'every';
     }
   });
 
