@@ -4,6 +4,9 @@
 
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const REQUEST_TIMEOUT_MS = 20000;
+const RETRY_DELAY_MS = 2000;
+// У бесплатных моделей общий пул: 429/5xx часто уходит за секунды — пробуем ещё раз
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
 const KINDS = new Set(['task', 'routine', 'sphere']);
 const GROUPS = new Set(['Н', 'Ж', 'П']);
@@ -17,15 +20,9 @@ group — "Н" (быт и насущное), "Ж" (желания и жизнь)
 durationMin — длительность в минутах от 5 до 240, указывай только для task.
 repeatRule — "daily" или "weekly", указывай только для routine.`;
 
-export async function categorizeWithLlm(rawText) {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-  if (!apiKey) return null;
-
-  const model = import.meta.env.VITE_LLM_MODEL || 'google/gemma-4-31b-it:free';
-
-  let response;
+async function sendRequest(apiKey, model, rawText) {
   try {
-    response = await fetch(API_URL, {
+    return await fetch(API_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -45,7 +42,24 @@ export async function categorizeWithLlm(rawText) {
   } catch {
     return null;
   }
-  if (!response.ok) return null;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function categorizeWithLlm(rawText) {
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) return null;
+
+  const model = import.meta.env.VITE_LLM_MODEL || 'google/gemma-4-31b-it:free';
+
+  let response = await sendRequest(apiKey, model, rawText);
+  if (response && RETRYABLE_STATUS.has(response.status)) {
+    await delay(RETRY_DELAY_MS);
+    response = await sendRequest(apiKey, model, rawText);
+  }
+  if (!response || !response.ok) return null;
 
   const data = await response.json().catch(() => null);
   const content = data?.choices?.[0]?.message?.content;

@@ -69,5 +69,5 @@ export async function categorize(rawText) {
   } catch {
     // деградация, а не отказ
   }
-  return rulesResult;
+  return { ...rulesResult, llmFailed: true };
 }

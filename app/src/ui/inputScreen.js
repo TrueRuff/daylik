@@ -7,7 +7,11 @@ import { DAY_NAMES, timeToMinutes, localInputToTs } from '../core/schedule.js';
 import { escapeHtml } from './dom.js';
 
 const KIND_TITLES = { sphere: 'Сфера', task: 'Дело', routine: 'Практика' };
-const PROVIDER_TITLES = { rules: 'разобрано по словарю', llm: 'разобрано через API' };
+
+function providerTitle(parsed) {
+  if (parsed.provider === 'llm') return 'разобрано через API';
+  return parsed.llmFailed ? 'по словарю — API недоступно' : 'разобрано по словарю';
+}
 
 export function initInputScreen(root) {
   let state = null;
@@ -43,7 +47,7 @@ export function initInputScreen(root) {
       <div class="card">
         <div class="row between">
           <strong>${KIND_TITLES[parsed.kind]}</strong>
-          <span class="muted">${PROVIDER_TITLES[parsed.provider] || ''}</span>
+          <span class="muted">${providerTitle(parsed)}</span>
         </div>
         <label>Название <input id="c-title" value="${escapeHtml(parsed.title)}"></label>
         <div class="row">

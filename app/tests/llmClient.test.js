@@ -17,6 +17,7 @@ describe('categorizeWithLlm', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('разбирает JSON-ответ в формат categorize', async () => {
@@ -67,6 +68,31 @@ describe('categorizeWithLlm', () => {
   it('ошибка сети → null', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     expect(await categorizeWithLlm('что-то')).toBeNull();
+  });
+
+  it('429 → повтор через 2 секунды приносит ответ', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 429 })
+      .mockResolvedValueOnce(
+        apiResponse('{"kind":"task","title":"Позвонить маме","group":"Н","durationMin":15}')
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+
+    const pending = categorizeWithLlm('позвонить маме');
+    await vi.advanceTimersByTimeAsync(2000);
+    const result = await pending;
+
+    expect(result.provider).toBe('llm');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('401 не повторяется — сразу null', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await categorizeWithLlm('что-то')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('HTTP-ошибка (401) → null', async () => {

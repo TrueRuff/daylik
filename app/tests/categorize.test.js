@@ -56,12 +56,12 @@ describe('categorize — гибрид правил и LLM', () => {
     expect(r.title).toBe('Отсортировать книги');
   });
 
-  it('LLM недоступен → остаёмся на правилах', async () => {
+  it('LLM недоступен → остаёмся на правилах с пометкой llmFailed', async () => {
     categorizeWithLlm.mockResolvedValueOnce(null);
 
     const r = await categorize('что-то совсем странное');
     expect(r.provider).toBe('rules');
-    expect(r.confidence).toBeLessThan(0.5);
+    expect(r.llmFailed).toBe(true);
   });
 
   it('LLM упал с ошибкой → деградация на правилах, а не отказ', async () => {
@@ -69,5 +69,6 @@ describe('categorize — гибрид правил и LLM', () => {
 
     const r = await categorize('что-то совсем странное');
     expect(r.provider).toBe('rules');
+    expect(r.llmFailed).toBe(true);
   });
 });
