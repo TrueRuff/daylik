@@ -1,6 +1,12 @@
-// Экран «День»: таймлайн 00:00–24:00 — рутины, поставленные дела, свободные окна.
-// Расстановка: перетаскиванием (drag'n'drop), кликом в окно или автоматически.
+// Экран «День»: календарь FullCalendar (вид день) — рутины и поставленные
+// дела. Расстановка: перетаскиванием из колонки дел, перенос/растягивание
+// событий, кликом (первое подходящее окно) или автоматически.
 
+import { Calendar } from '@fullcalendar/core';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import { Draggable } from '@fullcalendar/interaction';
+import ruLocale from '@fullcalendar/core/locales/ru';
+import enLocale from '@fullcalendar/core/locales/en-gb';
 import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask, savePractice, deletePractice, saveTask } from '../core/storage.js';
 import { categorize } from '../core/categorize.js';
 import { breakdownWithLlm } from '../ai/llmClient.js';
@@ -9,15 +15,12 @@ import {
   buildDay, computeFreeWindows, canPlaceAt, practicesToBlocks,
   adaptiveSort, autoPlaceLimit, recommendNow,
 } from '../core/dayPlan.js';
+import { eventsForRange, GROUP_COLORS } from '../core/calendarEvents.js';
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
-import { t } from '../core/i18n.js';
+import { t, getLang } from '../core/i18n.js';
 import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
 
-const PX_PER_MIN = 1;    // 1px в минуту: час = 60px, высота ленты 1440px
-const TIME_COL = 58;     // ширина колонки времени слева
-const DRAG_THRESHOLD = 6; // px, отличаем перетаскивание от клика
-const SNAP_MIN = 5;       // сетка таймлайна, минуты
 const ENERGY_KEY = 'daylik-energy';
 
 function todayWeekday() {
@@ -40,20 +43,37 @@ function saveEnergy(v) {
   }
 }
 
+function nowMinutes() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 export function initDayScreen(root) {
-  let picker = null; // окно, для которого открыт выбор дела
-  let editing = null; // id редактируемого дела
-  let state = null;   // данные текущей отрисовки
-  let drag = null;    // активное перетаскивание
+  let editing = null;   // id редактируемого дела
+  let state = null;     // данные текущей отрисовки
   let energy = loadEnergy();
-  let whatNow = null; // рекомендация «что сейчас»
+  let whatNow = null;   // рекомендация «что сейчас»
   let editPractice = null; // id редактируемого блока дня (рутины)
-  let scrolledToNow = false; // при первом показе дня лента раскрывается у «сейчас»
+  let calendar = null;
+  let currentEvents = [];
+
+  // Каркас живёт всё время экрана: шапка и колонка перерисовываются,
+  // календарь (FullCalendar) не пересоздаётся — только обновляет события
+  root.innerHTML = `
+    <div id="day-top"></div>
+    <div class="day-wrap">
+      <div id="cal-wrap"><div id="cal"></div></div>
+      <div class="side" id="side"></div>
+    </div>`;
+
+  const topEl = root.querySelector('#day-top');
+  const sideEl = root.querySelector('#side');
+
+  // ---------- сбор данных и отрисовка ----------
 
   async function render() {
     const date = todayStr();
     const practices = (await getPractices()).filter((p) => practiceAppliesOn(p, todayWeekday()));
-    const routines = practices.map((p) => ({ start: p.start, end: p.end, label: p.title, id: p.id }));
 
     const todo = await getTasks({ status: 'todo' });
     const done = (await getTasks({ status: 'done' })).sort((a, b) => b.createdAt - a.createdAt);
@@ -62,7 +82,7 @@ export function initDayScreen(root) {
     const editTask = editing ? allTasks.find((x) => x.id === editing) : null;
     if (editing && !editTask) editing = null;
     // запланированное = дата + конкретное время; отложенное «на завтра» без
-    // времени завтра вернётся в колонку дел, а не сломает таймлайн
+    // времени завтра вернётся в колонку дел, а не сломает календарь
     const scheduled = todo
       .filter((x) => x.scheduledDate === date && x.scheduledStart != null)
       .sort((a, b) => a.scheduledStart - b.scheduledStart);
@@ -86,14 +106,17 @@ export function initDayScreen(root) {
     const placeable = adaptiveSort(unscheduled.filter(fits), energy);
     const notFitting = unscheduled.filter((x) => !fits(x));
     const overdue = todo.filter((x) => x.scheduledDate && x.scheduledDate < date);
-    const isEmpty = !routines.length && !todo.length;
+    const routines = practices.map((p) => ({ start: p.start, end: p.end, label: p.title }));
     const stats = dayStats(date, todo, done, practices);
     const fmt = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
 
-    state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices,
+    state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices, todo,
       sphereNames: Object.fromEntries(spheres.map((s) => [s.id, s.name])) };
 
-    root.innerHTML = `
+    currentEvents = eventsForRange(date, date, practices, scheduled);
+    calendar?.refetchEvents();
+
+    topEl.innerHTML = `
       <div class="row between">
         <h2>${t('day.title')}</h2>
         <button id="what-now" class="secondary">${t('day.whatNow')}</button>
@@ -122,48 +145,22 @@ export function initDayScreen(root) {
       </div>` : ''}
       ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}
       ${editPractice !== null ? routineEditorHtml(editPractice === 'new' ? null : state.practices.find((p) => p.id === editPractice)) : ''}
-      ${picker ? pickerHtml(picker, placeable) : ''}
-      ${editTask ? editCardHtml(editTask, spheres) : ''}
-      <div class="day-wrap">
-        <div class="timeline" id="timeline">
-          ${hoursHtml()}
-          <div class="tl-now" style="top:${nowMinutes() * PX_PER_MIN}px"><span>${t('day.nowLabel')} ${minutesToTime(nowMinutes())}</span></div>
-          ${blocks.map(blockHtml).join('')}
-          ${windows.map(windowHtml).join('')}
-        </div>
-        <div class="side">
-          <div class="grp-zones" title="${t('task.dropGroup')}">
-            ${['Н', 'Ж', 'П'].map((g) => `<div class="grp-zone" data-g="${g}">${g} — ${t(`group.${g}`)}</div>`).join('')}
-          </div>
-          <h3>${t('day.tasks')}</h3>
-          ${unscheduled.length
-            ? [...placeable, ...notFitting].map((x) => taskRowHtml(x, fits(x))).join('')
-            : `<p class="muted">${t('day.noTasks')}</p>`}
-          <details class="done-box" ${done.length ? '' : ''}>
-            <summary>${t('day.doneCount', { n: done.length })}</summary>
-          ${done.length
-            ? done.slice(0, 15).map((task) => `
-              <button class="done-item" data-id="${task.id}" title="${t('task.return')}">
-                <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)}
-              </button>`).join('')
-            : `<p class="muted">${t('day.nothingDone')}</p>`}
-          </details>
-        </div>
-      </div>`;
+      ${editTask ? editCardHtml(editTask, spheres) : ''}`;
 
-    if (!scrolledToNow) {
-      scrolledToNow = true;
-      root.querySelector('.tl-now')?.scrollIntoView({ block: 'center', behavior: 'instant' });
-    }
-  }
-
-  function hoursHtml() {
-    let html = '';
-    for (let h = 0; h <= 24; h++) {
-      const label = h % 2 === 0 ? minutesToTime(h * 60) : '';
-      html += `<div class="tl-hour" style="top:${h * 60 * PX_PER_MIN}px">${label}</div>`;
-    }
-    return html;
+    sideEl.innerHTML = `
+      <h3>${t('day.tasks')}</h3>
+      ${unscheduled.length
+        ? [...placeable, ...notFitting].map((x) => taskRowHtml(x, fits(x))).join('')
+        : `<p class="muted">${t('day.noTasks')}</p>`}
+      <details class="done-box" ${done.length ? '' : ''}>
+        <summary>${t('day.doneCount', { n: done.length })}</summary>
+      ${done.length
+        ? done.slice(0, 15).map((task) => `
+          <button class="done-item" data-id="${task.id}" title="${t('task.return')}">
+            <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)}
+          </button>`).join('')
+        : `<p class="muted">${t('day.nothingDone')}</p>`}
+      </details>`;
   }
 
   // Общая подпись дела: бейдж группы, название, длительность, метка направления
@@ -175,7 +172,7 @@ export function initDayScreen(root) {
   function taskRowHtml(task, canPlace) {
     const label = taskLabel(task, canPlace ? '' : ` — ${t('day.notFit')}`);
     return `
-      <div class="task-row${canPlace ? '' : ' dimmed'}">
+      <div class="task-row${canPlace ? '' : ' dimmed'}" data-id="${task.id}">
         ${canPlace
           ? `<button class="side-task" data-id="${task.id}" title="${t('task.putFirst')}">${label}</button>`
           : `<span class="task-label">${label}</span>`}
@@ -234,34 +231,6 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  function blockHtml(b) {
-    const height = Math.max((b.end - b.start) * PX_PER_MIN, 22);
-    const top = b.start * PX_PER_MIN;
-    const time = `<div class="tl-time" style="top:${top}px">${minutesToTime(b.start)}</div>`;
-    const attrs = b.kind === 'task'
-      ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"`
-      : ` data-practice="${b.id || ''}" title="${t('routine.edit')}"`;
-    const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="${t('task.markDone')}">✓</span>` : '';
-    const ico = b.kind === 'task' ? '' : '<span class="tl-ico">↻</span>';
-    return `${time}
-      <div class="tl-block tl-${b.kind}"${attrs} style="top:${top}px;height:${height}px">
-        ${ico}${escapeHtml(b.label)}${done}
-      </div>`;
-  }
-
-  const fmtDur = (min) => (min >= 60 ? `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м` : `${min}м`);
-
-  function windowHtml(w) {
-    const height = Math.max((w.end - w.start) * PX_PER_MIN, 30);
-    const top = w.start * PX_PER_MIN;
-    return `
-      <div class="tl-window" style="top:${top}px;height:${height}px">
-        <span class="win-label muted">${t('day.freeWindow', { time: fmtDur(w.end - w.start) })}</span>
-        <button class="win-add" data-start="${w.start}" data-end="${w.end}"
-          title="${t('task.putInto', { a: minutesToTime(w.start), b: minutesToTime(w.end) })}">+</button>
-      </div>`;
-  }
-
   // Карточка блока дня: создание нового или правка существующей рутины
   function routineEditorHtml(p) {
     const isNew = !p;
@@ -282,28 +251,6 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  function pickerHtml(w, list) {
-    const fitting = list.filter((x) => x.durationMin <= w.end - w.start);
-    return `
-      <div class="card">
-        <div class="row between">
-          <strong>${t('day.window')} ${minutesToTime(w.start)}–${minutesToTime(w.end)}</strong>
-          <button id="picker-close" class="secondary">${t('common.close')}</button>
-        </div>
-        <label>${t('picker.time')} <input id="pick-time" type="time" step="300" value="${minutesToTime(w.start)}"></label>
-        <p id="pick-msg" class="muted"></p>
-        ${fitting.length
-          ? fitting.map((x) => `
-            <button class="pick-task" data-id="${x.id}" data-start="${w.start}">${taskLabel(x)}</button>`).join('')
-          : `<p class="muted">${t('picker.noFit')}</p>`}
-      </div>`;
-  }
-
-  function nowMinutes() {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  }
-
   function whatNowHtml(rec) {
     return `
       <div class="card">
@@ -321,9 +268,8 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // Занятость дня без указанного дела — для проверки мест при перетаскивании.
-  // Рутины через practicesToBlocks: полночная практика разбита, иначе canPlaceAt
-  // пропустит дело на 23:30 поверх сна
+  // Занятость дня без указанного дела — для проверки места при смене длительности.
+  // Рутины через practicesToBlocks: полночная практика разбита
   function occupancyExcept(taskId) {
     return [
       ...practicesToBlocks(state.practices),
@@ -333,22 +279,12 @@ export function initDayScreen(root) {
     ];
   }
 
-  // Координата указателя -> минута таймлайна с шагом SNAP_MIN
-  function pointerToMinutes(timeline, clientY, durationMin) {
-    const rect = timeline.getBoundingClientRect();
-    const raw = (clientY - rect.top) / PX_PER_MIN;
-    const snapped = Math.round(raw / SNAP_MIN) * SNAP_MIN;
-    return Math.max(0, Math.min(snapped, 24 * 60 - durationMin));
-  }
-
   async function autoPlace() {
     const { date, routines, scheduled, unscheduled } = state;
-    // уже поставленные дела тоже занимают время — учитываем их как занятость
     const occupancy = [
       ...routines,
       ...scheduled.map((x) => ({ start: x.scheduledStart, end: x.scheduledStart + x.durationMin, label: x.title })),
     ];
-    // уставшему — ограниченная порция дел, стратегия зависит от уровня энергии
     const limit = autoPlaceLimit(energy);
     const batch = adaptiveSort(unscheduled, energy).slice(0, limit);
     const plan = buildDay(date, occupancy, batch, { sort: (xs) => adaptiveSort(xs, energy) });
@@ -359,106 +295,104 @@ export function initDayScreen(root) {
     render();
   }
 
-  // ---------- перетаскивание ----------
-  // Клик без движения сохраняет старые действия: блок на таймлайне — убрать,
-  // дело в колонке — в первое подходящее окно. Движение сверх порога — drag.
+  // ---------- календарь FullCalendar ----------
 
-  root.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    const block = e.target.closest('.tl-task');
-    const sideItem = e.target.closest('.side-task');
-    const src = block || sideItem;
-    if (!src || e.target.closest('.tl-done')) return;
+  calendar = new Calendar(root.querySelector('#cal'), {
+    plugins: [timeGridPlugin],
+    initialView: 'timeGridDay',
+    locale: getLang() === 'en' ? enLocale : ruLocale,
+    headerToolbar: false,
+    allDaySlot: false,
+    slotMinTime: '00:00:00',
+    slotMaxTime: '24:00:00',
+    slotDuration: '00:30:00',
+    slotLabelInterval: '01:00:00',
+    dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' },
+    height: 780,
+    scrollTime: minutesToTime(Math.max(0, nowMinutes() - 90)),
+    nowIndicator: true,
+    snapDuration: '00:05:00',
+    events: (info, success) => success(currentEvents),
+    editable: true,
 
-    const task = (state?.allTasks || []).find((x) => x.id === src.dataset.id);
-    if (!task) return;
+    // перенос дела: сохраняем новое время начала
+    eventDrop: async (info) => {
+      const { kind, taskId } = info.event.extendedProps;
+      if (kind !== 'task') {
+        info.revert();
+        return;
+      }
+      const start = info.event.start;
+      await updateTask(taskId, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
+      whatNow = null;
+      render();
+    },
 
-    drag = { el: src, taskId: task.id, durationMin: task.durationMin, startX: e.clientX, startY: e.clientY, moved: false, ghost: null };
-    try {
-      src.setPointerCapture(e.pointerId);
-    } catch {
-      // без захвата pointermove всё равно всплывает до root
-    }
+    // растягивание дела: меняем длительность (шаг 5 мин)
+    eventResize: async (info) => {
+      const { kind, taskId } = info.event.extendedProps;
+      if (kind !== 'task') {
+        info.revert();
+        return;
+      }
+      const dur = Math.round((info.event.end - info.event.start) / 300000);
+      if (dur < 5 || dur > 480) {
+        info.revert();
+        return;
+      }
+      await updateTask(taskId, { durationMin: dur * 5 });
+      whatNow = null;
+      render();
+    },
+
+    // клик по событию: дело — карточка редактирования, рутина — редактор блока
+    eventClick: (info) => {
+      const { kind, taskId, practiceId } = info.event.extendedProps;
+      if (kind === 'task') {
+        editing = taskId;
+        pickerToTop();
+      } else if (practiceId) {
+        editPractice = practiceId;
+        pickerToTop();
+      }
+      render();
+    },
+
+    // бросок из колонки дел: ставим дело на полученное время
+    eventReceive: async (info) => {
+      const id = info.draggedEl.dataset.id;
+      info.event.remove();
+      const start = info.event.start;
+      if (id && start) {
+        await updateTask(id, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
+        whatNow = null;
+      }
+      render();
+    },
+  });
+  calendar.render();
+
+  // дела из колонки тянутся в календарь (FullCalendar Draggable)
+  new Draggable(sideEl, {
+    itemSelector: '.task-row',
+    eventData: (el) => {
+      const task = (state?.allTasks || []).find((x) => x.id === el.dataset.id);
+      if (!task) return {};
+      return {
+        title: `${task.group} · ${task.title}`,
+        duration: { minutes: task.durationMin },
+        backgroundColor: GROUP_COLORS[task.group] ?? undefined,
+      };
+    },
   });
 
-  root.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-
-    if (!drag.moved) {
-      drag.moved = true;
-      const ghost = drag.el.cloneNode(true);
-      ghost.className = `drag-ghost ${drag.el.className}`;
-      ghost.style.width = `${drag.el.offsetWidth}px`;
-      document.body.appendChild(ghost);
-      drag.ghost = ghost;
-      drag.el.classList.add('drag-src');
-    }
-    drag.ghost.style.left = `${e.clientX}px`;
-    drag.ghost.style.top = `${e.clientY}px`;
-
-    // сначала — зоны смены группы в колонке дел
-    let overGroup = null;
-    root.querySelectorAll('.grp-zone').forEach((zone) => {
-      const r = zone.getBoundingClientRect();
-      const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      zone.classList.toggle('drop-col', over);
-      if (over) overGroup = zone.dataset.g;
-    });
-    drag.dropGroup = overGroup;
-
-    const timeline = root.querySelector('#timeline');
-    const inTimeline = !overGroup && timeline && e.clientX >= timeline.getBoundingClientRect().left;
-    const minutes = inTimeline ? pointerToMinutes(timeline, e.clientY, drag.durationMin) : null;
-    const ok = minutes != null && canPlaceAt(occupancyExcept(drag.taskId), minutes, drag.durationMin, drag.taskId);
-    drag.dropAt = ok ? minutes : null;
-    timeline?.classList.toggle('drop-ok', ok);
-    timeline?.classList.toggle('drop-bad', minutes != null && !ok);
-  });
-
-  root.addEventListener('pointerup', async () => {
-    if (!drag) return;
-    const { taskId, moved, dropAt, dropGroup, ghost, el } = drag;
-    const wasDrag = moved;
-    ghost?.remove();
-    el.classList.remove('drag-src');
-    root.querySelectorAll('.grp-zone').forEach((z) => z.classList.remove('drop-col'));
-    root.querySelector('#timeline')?.classList.remove('drop-ok', 'drop-bad');
-    drag = null;
-
-    if (!wasDrag) return; // обычный клик — обработает click-слушатель
-    suppressClick();
-    whatNow = null; // рекомендация устарела: расписание только что изменилось
-    if (dropGroup) {
-      await updateTask(taskId, { group: dropGroup });
-    } else if (dropAt != null) {
-      await updateTask(taskId, { scheduledDate: state.date, scheduledStart: dropAt });
-    }
-    render();
-  });
-
-  root.addEventListener('pointercancel', () => {
-    if (!drag) return;
-    drag.ghost?.remove();
-    drag.el.classList.remove('drag-src');
-    root.querySelectorAll('.grp-zone').forEach((z) => z.classList.remove('drop-col'));
-    root.querySelector('#timeline')?.classList.remove('drop-ok', 'drop-bad');
-    drag = null;
-    suppressClick();
-    render();
-  });
-
-  // после перетаскивания подавляем следующий клик (pointerup -> click)
-  let skipClick = false;
-  function suppressClick() {
-    skipClick = true;
-    setTimeout(() => { skipClick = false; }, 50);
+  function pickerToTop() {
+    root.closest('main')?.scrollTo?.({ top: 0, behavior: 'smooth' });
   }
 
+  // ---------- обработчики ----------
+
   root.addEventListener('click', async (e) => {
-    if (skipClick) return;
     if (e.target.closest('#auto-place')) {
       await autoPlace();
       return;
@@ -488,6 +422,7 @@ export function initDayScreen(root) {
 
     if (e.target.closest('#add-routine')) {
       editPractice = 'new';
+      pickerToTop();
       render();
       return;
     }
@@ -524,14 +459,6 @@ export function initDayScreen(root) {
       return;
     }
 
-    const routineBlock = e.target.closest('.tl-routine');
-    if (routineBlock?.dataset.practice) {
-      editPractice = routineBlock.dataset.practice;
-      routineBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      render();
-      return;
-    }
-
     const place = e.target.closest('#whatnow-place');
     if (place) {
       await updateTask(place.dataset.id, { scheduledDate: state.date, scheduledStart: Number(place.dataset.start) });
@@ -554,11 +481,6 @@ export function initDayScreen(root) {
       return;
     }
 
-    if (e.target.closest('#picker-close')) {
-      picker = null;
-      render();
-      return;
-    }
     if (e.target.closest('#edit-close')) {
       editing = null;
       render();
@@ -650,35 +572,7 @@ export function initDayScreen(root) {
     const editBtn = e.target.closest('.edit-btn');
     if (editBtn) {
       editing = editBtn.dataset.id;
-      picker = null;
-      render();
-      return;
-    }
-
-    const pick = e.target.closest('.pick-task');
-    if (pick) {
-      // время из поля пикера (по умолчанию — начало окна); проверяем влезание
-      const timeVal = root.querySelector('#pick-time')?.value;
-      const start = timeVal ? timeToMinutes(timeVal) : Number(pick.dataset.start);
-      const task = state.allTasks.find((x) => x.id === pick.dataset.id);
-      const ok = task
-        && start >= picker.start
-        && start + task.durationMin <= picker.end;
-      if (!ok) {
-        const msg = root.querySelector('#pick-msg');
-        if (msg) msg.textContent = t('day.notFit');
-        return;
-      }
-      await updateTask(pick.dataset.id, { scheduledDate: state.date, scheduledStart: start });
-      picker = null;
-      whatNow = null;
-      render();
-      return;
-    }
-
-    const add = e.target.closest('.win-add');
-    if (add) {
-      picker = { start: Number(add.dataset.start), end: Number(add.dataset.end) };
+      pickerToTop();
       render();
       return;
     }
@@ -709,20 +603,6 @@ export function initDayScreen(root) {
         render();
       }
       return;
-    }
-
-    const tlDone = e.target.closest('.tl-done');
-    if (tlDone) {
-      const task = state.allTasks.find((x) => x.id === tlDone.dataset.id);
-      if (task) await completeTask(task);
-      render();
-      return;
-    }
-
-    const taskBlock = e.target.closest('.tl-task');
-    if (taskBlock && taskBlock.dataset.id) {
-      await updateTask(taskBlock.dataset.id, { scheduledDate: null, scheduledStart: null });
-      render();
     }
   });
 

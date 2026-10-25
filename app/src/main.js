@@ -3,6 +3,7 @@
 import './styles.css';
 import '@fontsource-variable/inter';
 import { initDayScreen } from './ui/dayScreen.js';
+import { initCalendarScreen } from './ui/calendarScreen.js';
 import { initSpheresScreen } from './ui/spheresScreen.js';
 import { initInputScreen } from './ui/inputScreen.js';
 import { initLogScreen } from './ui/logScreen.js';
@@ -15,6 +16,7 @@ import { getLang, setLang, onChange, applyStatic, t } from './core/i18n.js';
 
 const screens = {
   day: document.getElementById('tab-day'),
+  calendar: document.getElementById('tab-calendar'),
   spheres: document.getElementById('tab-spheres'),
   input: document.getElementById('tab-input'),
   log: document.getElementById('tab-log'),
@@ -32,6 +34,7 @@ const logTabBtn = document.querySelector('nav button[data-tab="log"]');
 initLog();
 
 initDayScreen(screens.day);
+initCalendarScreen(screens.calendar);
 initSpheresScreen(screens.spheres);
 initInputScreen(screens.input);
 initLogScreen(screens.log);

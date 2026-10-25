@@ -134,6 +134,7 @@ button.danger { background: var(--danger); border-color: var(--danger); }
 
 label { display: block; margin: 10px 0; font-size: 13.5px; font-weight: 550; }
 input[type='text'],
+input[type='password'],
 input:not([type]),
 select,
 textarea {
@@ -299,119 +300,40 @@ select { width: auto; min-width: 150px; }
 .practice-row .del-practice:hover,
 .del-free-practice:hover { color: #8c2c2c; opacity: 1; background: none; }
 
-/* ---------- день: таймлайн (лента Structured/Tiimo-стиля) ---------- */
+/* ---------- день: календарь FullCalendar ---------- */
 
 .day-wrap { display: grid; grid-template-columns: 1fr 292px; gap: 20px; align-items: start; }
-.timeline {
-  position: relative;
-  height: 1440px; /* 24ч * 60мин * 1px */
+#cal-wrap {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
 }
-.tl-hour {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-top: 1px solid #f4f2ec;
-  font-size: 9.5px;
-  font-weight: 500;
-  color: #c4c0b6;
-  padding: 1px 0 0 6px;
-  font-variant-numeric: tabular-nums;
-}
-/* время события: крупно слева, на уровне карточки */
-.tl-time {
-  position: absolute;
-  left: 6px;
-  width: 46px;
-  text-align: right;
-  font-size: 12.5px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-  transform: translateY(-2px);
-  z-index: 3;
-  background: var(--surface);
-}
-.tl-block {
-  position: absolute;
-  left: 64px;
-  right: 12px;
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  font-size: 13.5px;
-  font-weight: 600;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  line-height: 1.25;
-}
-.tl-routine {
-  background: #eaedf2;
-  color: #333a46;
-  border-left: 4px solid #8d99ad;
-  cursor: pointer;
-}
-.tl-routine:hover { outline: 2px solid #8d99ad; }
-.tl-task {
-  background: #eaf2e6;
-  color: #223318;
-  border-left: 4px solid #6a9b52;
-  cursor: grab;
-}
-.tl-task:hover { outline: 2px solid #6a9b52; }
-.tl-done { margin-left: auto; color: #3e6330; font-weight: 700; cursor: pointer; padding-left: 8px; }
-.tl-window {
-  position: absolute;
-  left: 64px;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border-radius: var(--radius-sm);
-  background: repeating-linear-gradient(45deg, #faf9f6, #faf9f6 6px, #f4f2ec 6px, #f4f2ec 12px);
-  transition: background .15s;
-}
-.tl-window:hover { background: #f1efe9; }
-.win-label { font-size: 12px; font-weight: 550; background: var(--surface); border-radius: 999px; padding: 2px 10px; }
-.win-add {
+.fc { font-size: 12.5px; }
+.fc .fc-toolbar-title { font-size: 16px; font-weight: 650; }
+.fc .fc-button {
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  color: var(--ink-soft);
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  line-height: 1;
-  font-size: 17px;
-  padding: 0;
-  font-weight: 400;
+  color: var(--ink);
+  font-weight: 550;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
 }
-.win-add:hover { background: var(--ink); border-color: var(--ink); color: #fff; opacity: 1; }
-.tl-now {
-  position: absolute;
-  left: 56px;
-  right: 12px;
-  border-top: 2px solid var(--now);
-  z-index: 2;
+.fc .fc-button:hover { background: var(--accent-soft); }
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fc .fc-event { border-radius: 6px; font-weight: 550; cursor: pointer; border-width: 0; padding-left: 3px; }
+.fc .fc-timegrid-slot { height: 1.7em; }
+.fc-theme-standard td, .fc-theme-standard th { border-color: var(--line); }
+.fc .fc-timegrid-now-indicator-line { border-color: var(--now); }
+.fc .fc-daygrid-day.fc-day-today,
+.fc .fc-timegrid-col.fc-day-today { background: var(--accent-soft); }
+#tab-calendar .fc {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 6px;
 }
-.tl-now span {
-  position: absolute;
-  right: 6px;
-  top: -11px;
-  background: var(--now);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 650;
-  border-radius: 999px;
-  padding: 2px 10px;
-  box-shadow: 0 2px 8px rgba(208, 101, 101, .4);
-  font-variant-numeric: tabular-nums;
-}
-.timeline.drop-ok { outline: 2px solid var(--success); outline-offset: -2px; }
-.timeline.drop-bad { outline: 2px solid var(--danger); outline-offset: -2px; }
 
 /* ---------- день: боковая колонка ---------- */
 
@@ -439,7 +361,7 @@ select { width: auto; min-width: 150px; }
 .task-row .side-task:hover { border-color: var(--line-strong); background: #fdfcfa; opacity: 1; }
 .task-label { color: var(--ink-soft); font-weight: 450; }
 .task-row.dimmed { opacity: .55; }
-.task-row .side-task, .tl-task { touch-action: none; cursor: grab; }
+.task-row .side-task { touch-action: none; cursor: grab; }
 .side-task, .pick-task {
   display: block;
   width: 100%;
@@ -491,16 +413,6 @@ select { width: auto; min-width: 150px; }
 }
 .done-box summary:hover { color: var(--ink); }
 
-.grp-zones { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.grp-zone {
-  font-size: 11px;
-  font-weight: 550;
-  color: var(--ink-soft);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-sm);
-  padding: 4px 10px;
-  transition: background .15s, border-color .15s;
-}
 .drop-col {
   background: #e9f2e9 !important;
   border-color: var(--success) !important;
@@ -589,7 +501,6 @@ select { width: auto; min-width: 150px; }
 }
 .day input { accent-color: var(--accent); }
 .example { font-size: 12px; padding: 4px 11px; }
-.tl-done { cursor: pointer; }
 
 @media (max-width: 700px) {
   main { padding: 14px 12px 44px; }
@@ -603,7 +514,6 @@ select { width: auto; min-width: 150px; }
   .side { order: -1; } /* дела важнее пустого таймлайна на телефоне */
 }
 
-.tl-ico { opacity: .55; margin-right: 7px; font-weight: 400; font-size: 12px; }
 
 /* ---------- вход в аккаунт ---------- */
 
