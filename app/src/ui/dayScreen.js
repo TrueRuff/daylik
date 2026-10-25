@@ -12,7 +12,7 @@ import {
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml, daysCheckboxes } from './dom.js';
+import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
 
 const PX_PER_MIN = 1;    // 1px в минуту: час = 60px, высота ленты 1440px
 const TIME_COL = 58;     // ширина колонки времени слева
@@ -48,6 +48,7 @@ export function initDayScreen(root) {
   let energy = loadEnergy();
   let whatNow = null; // рекомендация «что сейчас»
   let editPractice = null; // id редактируемого блока дня (рутины)
+  let scrolledToNow = false; // при первом показе дня лента раскрывается у «сейчас»
 
   async function render() {
     const date = todayStr();
@@ -149,6 +150,11 @@ export function initDayScreen(root) {
           </details>
         </div>
       </div>`;
+
+    if (!scrolledToNow) {
+      scrolledToNow = true;
+      root.querySelector('.tl-now')?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
   }
 
   function hoursHtml() {
@@ -189,10 +195,7 @@ export function initDayScreen(root) {
         <div class="row">
           <label>${t('task.duration')} <input id="e-dur" type="number" min="5" step="5" value="${task.durationMin}"></label>
           <label>${t('common.group')}
-            <select id="e-group">
-              ${['Н', 'Ж', 'П'].map((g) =>
-                `<option value="${g}"${g === task.group ? ' selected' : ''}>${g} — ${t(`group.${g}`)}</option>`).join('')}
-            </select>
+            <select id="e-group">${groupOptions(task.group)}</select>
           </label>
         </div>
         <label>${t('common.sphere')}
@@ -239,9 +242,10 @@ export function initDayScreen(root) {
       ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"`
       : ` data-practice="${b.id || ''}" title="${t('routine.edit')}"`;
     const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="${t('task.markDone')}">✓</span>` : '';
+    const ico = b.kind === 'task' ? '' : '<span class="tl-ico">↻</span>';
     return `${time}
       <div class="tl-block tl-${b.kind}"${attrs} style="top:${top}px;height:${height}px">
-        ${escapeHtml(b.label)}${done}
+        ${ico}${escapeHtml(b.label)}${done}
       </div>`;
   }
 
@@ -269,10 +273,7 @@ export function initDayScreen(root) {
         </div>
         <p class="muted">${t('routine.hint')}</p>
         <label>${t('common.title')} <input id="r-title" value="${escapeHtml(p?.title || '')}" placeholder="${t('input.placeholder')}"></label>
-        <div class="row">
-          <label>${t('common.start')} <input id="r-start" type="time" value="${p ? minutesToTime(p.start) : '23:00'}"></label>
-          <label>${t('common.end')} <input id="r-end" type="time" value="${p ? minutesToTime(p.end) : '07:00'}"></label>
-        </div>
+        ${timeRangeFields(p ? minutesToTime(p.start) : '23:00', p ? minutesToTime(p.end) : '07:00')}
         <div class="days">${daysCheckboxes(isNew ? undefined : p.days)}</div>
         <div class="row">
           <button id="routine-save" data-id="${p?.id || ''}">${t('common.save')}</button>
@@ -502,13 +503,14 @@ export function initDayScreen(root) {
       const days = [...root.querySelectorAll('.days input:checked')].map((c) => Number(c.dataset.day));
       if (!title || !days.length) return;
       const old = state.practices.find((p) => p.id === e.target.dataset.id);
+      const card = e.target.closest('.card');
       await savePractice(new Practice({
         id: e.target.dataset.id || crypto.randomUUID(),
         sphereId: old?.sphereId ?? null,
         title,
         days,
-        start: timeToMinutes(root.querySelector('#r-start').value || '23:00'),
-        end: timeToMinutes(root.querySelector('#r-end').value || '07:00'),
+        start: timeToMinutes(card.querySelector('.js-start').value || '23:00'),
+        end: timeToMinutes(card.querySelector('.js-end').value || '07:00'),
       }));
       editPractice = null;
       render();

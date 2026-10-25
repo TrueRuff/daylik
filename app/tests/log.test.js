@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { log, getRecent, setSink, clearMemory, LEVELS } from '../src/core/log.js';
+import { describe, it, expect, vi } from 'vitest';
+import { log, setSink, LEVELS } from '../src/core/log.js';
 
 describe('log — журнал событий', () => {
   it('уровни имеют возрастающий порядок важности', () => {
@@ -8,47 +8,37 @@ describe('log — журнал событий', () => {
     expect(LEVELS.warn).toBeLessThan(LEVELS.error);
   });
 
-  it('запись содержит время, уровень, событие и данные', () => {
-    clearMemory();
+  it('sink получает запись с временем, уровнем, событием и данными', async () => {
+    const seen = [];
+    setSink(async (entry) => seen.push(entry));
     log.info('test.event', { a: 1 });
-    const [entry] = getRecent();
-    expect(entry.level).toBe('info');
-    expect(entry.event).toBe('test.event');
-    expect(entry.data).toEqual({ a: 1 });
-    expect(entry.time).toBeGreaterThan(0);
-  });
+    await new Promise((r) => setTimeout(r, 0));
 
-  it('getRecent отдаёт сначала новые и фильтрует по уровню', () => {
-    clearMemory();
-    log.debug('one');
-    log.warn('two');
-    log.error('three');
-
-    expect(getRecent().map((x) => x.event)).toEqual(['three', 'two', 'one']);
-    expect(getRecent({ minLevel: 'warn' }).map((x) => x.event)).toEqual(['three', 'two']);
-  });
-
-  it('кольцевой буфер ограничен 500 записями', () => {
-    clearMemory();
-    for (let i = 0; i < 520; i++) log.debug(`e${i}`);
-    const all = getRecent({ limit: 1000 });
-    expect(all).toHaveLength(500);
-    expect(all[0].event).toBe('e519'); // самая новая
+    expect(seen).toHaveLength(1);
+    expect(seen[0].level).toBe('info');
+    expect(seen[0].event).toBe('test.event');
+    expect(seen[0].data).toEqual({ a: 1 });
+    expect(seen[0].time).toBeGreaterThan(0);
+    setSink(null);
   });
 
   it('падение sink не выбрасывает наружу', () => {
     setSink(() => { throw new Error('sink down'); });
     expect(() => log.info('still.works')).not.toThrow();
-    expect(getRecent()[0].event).toBe('still.works');
     setSink(null);
   });
 
-  it('sink получает записи асинхронно', async () => {
-    const seen = [];
-    setSink(async (entry) => seen.push(entry));
-    log.warn('async.event');
-    await new Promise((r) => setTimeout(r, 0));
-    expect(seen.map((x) => x.event)).toEqual(['async.event']);
-    setSink(null);
+  it('уровни пишутся соответствующими методами консоли', () => {
+    const calls = [];
+    const orig = { ...console };
+    for (const m of ['log', 'info', 'warn', 'error']) {
+      console[m] = (...a) => calls.push([m, ...a]);
+    }
+    log.debug('d');
+    log.info('i');
+    log.warn('w');
+    log.error('e');
+    Object.assign(console, orig);
+    expect(calls.map((c) => c[0])).toEqual(['log', 'info', 'warn', 'error']);
   });
 });

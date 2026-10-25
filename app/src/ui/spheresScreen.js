@@ -12,7 +12,7 @@ import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport
 import { toIcs } from '../core/ics.js';
 import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml, downloadFile, daysCheckboxes } from './dom.js';
+import { escapeHtml, downloadFile, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
 
 const EXAMPLES = [
   { name: 'Сон', group: 'Н' },
@@ -75,10 +75,7 @@ export function initSpheresScreen(root) {
         <h3>${isNew ? t('spheres.new') : escapeHtml(sphere.name)}</h3>
         <label>${t('common.title')} <input id="s-name" value="${escapeHtml(sphere.name)}"></label>
         <label>${t('common.group')}
-          <select id="s-group">
-            ${['Н', 'Ж', 'П'].map((g) =>
-              `<option value="${g}"${g === sphere.group ? ' selected' : ''}>${g} — ${t(`group.${g}`)}</option>`).join('')}
-          </select>
+          <select id="s-group">${groupOptions(sphere.group)}</select>
         </label>
         <label>${t('spheres.briefLabel')}
           <textarea id="s-brief" rows="2">${escapeHtml(sphere.brief)}</textarea>
@@ -107,10 +104,7 @@ export function initSpheresScreen(root) {
             <button class="del-practice" data-id="${p.id}" title="${t('common.delete')}">×</button>
           </div>`).join('') : `<p class="muted">${t('spheres.noPractices')}</p>`}
         <label>${t('spheres.newPractice')} <input id="p-title" placeholder="${t('input.placeholder')}"></label>
-        <div class="row">
-          <label>${t('common.start')} <input id="p-start" type="time" value="09:00"></label>
-          <label>${t('common.end')} <input id="p-end" type="time" value="10:00"></label>
-        </div>
+        ${timeRangeFields()}
         <div class="days">${daysCheckboxes()}</div>
         <p><button id="add-practice" data-id="${sphere.id}" class="secondary">${t('spheres.addPractice')}</button></p>`}
       </div>`;
@@ -332,12 +326,13 @@ export function initSpheresScreen(root) {
       const title = root.querySelector('#p-title').value.trim();
       const days = [...root.querySelectorAll('.days input:checked')].map((c) => Number(c.dataset.day));
       if (!title || !days.length) return;
+      const card = e.target.closest('.card');
       const practice = new Practice({
         id: crypto.randomUUID(),
         sphereId: e.target.dataset.id,
         title,
-        start: timeToMinutes(root.querySelector('#p-start').value || '09:00'),
-        end: timeToMinutes(root.querySelector('#p-end').value || '10:00'),
+        start: timeToMinutes(card.querySelector('.js-start').value || '09:00'),
+        end: timeToMinutes(card.querySelector('.js-end').value || '10:00'),
         days,
       });
       await savePractice(practice);

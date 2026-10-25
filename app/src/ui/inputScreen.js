@@ -5,7 +5,7 @@ import { Task, Sphere, Practice } from '../core/models.js';
 import { saveTask, saveSphere, savePractice, getAllSpheres } from '../core/storage.js';
 import { dayNames, timeToMinutes, localInputToTs } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml, daysCheckboxes } from './dom.js';
+import { escapeHtml, daysCheckboxes, timeRangeFields } from './dom.js';
 
 function kindTitle(kind) {
   return t(`kind.${kind}`);
@@ -74,10 +74,7 @@ export function initInputScreen(root) {
             `<button class="grp${g === state.group ? ' on' : ''}" data-g="${g}">${g} — ${t(`group.${g}`)}</button>`).join('')}
         </div>
         ${state.kind === 'routine' ? `
-        <div class="row">
-          <label>${t('common.start')} <input id="c-start" type="time" value="09:00"></label>
-          <label>${t('common.end')} <input id="c-end" type="time" value="10:00"></label>
-        </div>
+        ${timeRangeFields()}
         <div class="days">${daysCheckboxes()}</div>` : ''}
         ${state.kind === 'task' ? `
         <div class="row">
@@ -135,8 +132,8 @@ export function initInputScreen(root) {
         id,
         title,
         days,
-        start: timeToMinutes(confirmEl.querySelector('#c-start').value || '09:00'),
-        end: timeToMinutes(confirmEl.querySelector('#c-end').value || '10:00'),
+        start: timeToMinutes(confirmEl.querySelector('.js-start').value || '09:00'),
+        end: timeToMinutes(confirmEl.querySelector('.js-end').value || '10:00'),
       }));
       saved(t('routine.saved', { title }));
     } else {

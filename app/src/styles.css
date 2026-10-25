@@ -602,3 +602,5 @@ select { width: auto; min-width: 150px; }
   .input-row { flex-wrap: nowrap; }
   .side { order: -1; } /* дела важнее пустого таймлайна на телефоне */
 }
+
+.tl-ico { opacity: .55; margin-right: 7px; font-weight: 400; font-size: 12px; }
