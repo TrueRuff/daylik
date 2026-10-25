@@ -8,6 +8,16 @@
     <link rel="icon" type="image/png" href="icon-192.png" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <title>Дейлик — планировщик</title>
+    <script>
+      // тема до первой отрисовки: сохранённый выбор или системная
+      try {
+        const t = localStorage.getItem('daylik-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+        else if (matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <header class="row between">
@@ -16,6 +26,7 @@
         <span id="who" class="muted" hidden></span>
         <button id="logout" class="secondary" data-i18n="auth.logout" hidden>Выйти</button>
         <button id="lang" class="secondary" hidden>EN</button>
+        <button id="theme" class="secondary" data-i18n-title="theme.toggle" hidden>☾</button>
         <button id="bell" class="secondary" data-i18n="bell.enable" hidden>Включить напоминания</button>
       </div>
     </header>

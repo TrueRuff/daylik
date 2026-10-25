@@ -26,6 +26,7 @@ export const DICTS = {
     'auth.empty': 'Заполни логин и пароль',
     'auth.short': 'Пароль — минимум 3 символа',
     'auth.logout': 'Выйти',
+    'theme.toggle': 'Сменить тему',
 
     'day.title': 'Сегодня',
     'day.autoPlace': 'Разложить автоматически',
@@ -175,6 +176,7 @@ export const DICTS = {
     'auth.empty': 'Fill in login and password',
     'auth.short': 'Password must be at least 3 characters',
     'auth.logout': 'Sign out',
+    'theme.toggle': 'Toggle theme',
 
     'day.title': 'Today',
     'day.autoPlace': 'Auto-arrange',

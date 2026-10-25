@@ -68,6 +68,7 @@ function enterApp(acc) {
   whoEl.textContent = acc.login;
   logoutBtn.hidden = false;
   langBtn.hidden = false;
+  themeBtn.hidden = false;
   logTabBtn.hidden = !isAdmin(acc);
   refreshBell();
   showTab('day');
@@ -121,6 +122,32 @@ onChange(() => {
 
 applyStatic();
 refreshLangBtn();
+
+// Тема: светлая/тёмная, старт — по сохранённому выбору или системной
+// (первичная установка делает inline-скрипт в index.html до отрисовки)
+const themeBtn = document.getElementById('theme');
+const THEME_KEY = 'daylik-theme';
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function refreshThemeBtn() {
+  themeBtn.textContent = currentTheme() === 'dark' ? '☀' : '☾';
+}
+
+themeBtn.addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    // сохранение не критично
+  }
+  refreshThemeBtn();
+  log.info('theme.change', { theme: next });
+});
+refreshThemeBtn();
 
 // Уведомления: разрешение спрашиваем кнопкой, затем работает цикл напоминаний
 const bell = document.getElementById('bell');
