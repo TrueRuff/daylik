@@ -237,7 +237,7 @@ export function normalizeImport(obj) {
       const task = new Task(t);
       task.sphereId = refOrphan(task.sphereId);
       task.group = safeGroup(task.group);
-      task.durationMin = safeInt(task.durationMin, 30, 5, 240);
+      task.durationMin = safeInt(task.durationMin, 30, 5, 480);
       if (!isRepeatRule(task.repeatRule)) task.repeatRule = null;
       return task;
     });

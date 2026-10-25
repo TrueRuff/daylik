@@ -12,7 +12,7 @@ import { categorize } from '../core/categorize.js';
 import { breakdownWithLlm } from '../ai/llmClient.js';
 import { practiceAppliesOn, minutesToTime, timeToMinutes, tsToLocalInput, localInputToTs, todayStr, addDays } from '../core/schedule.js';
 import {
-  buildDay, computeFreeWindows, canPlaceAt, practicesToBlocks,
+  buildDay, computeFreeWindows, practicesToBlocks,
   adaptiveSort, autoPlaceLimit, recommendNow,
 } from '../core/dayPlan.js';
 import { eventsForRange, GROUP_COLORS } from '../core/calendarEvents.js';
@@ -170,12 +170,13 @@ export function initDayScreen(root) {
     + `${suffix}</span>`;
 
   function taskRowHtml(task, canPlace) {
+    // не влезающее дело остаётся кликабельным — встанет в первое окно
+    // с перекрытием (оценка времени приблизительна, это нормально)
     const label = taskLabel(task, canPlace ? '' : ` — ${t('day.notFit')}`);
     return `
       <div class="task-row${canPlace ? '' : ' dimmed'}" data-id="${task.id}">
-        ${canPlace
-          ? `<button class="side-task" data-id="${task.id}" title="${t('task.putFirst')}">${label}</button>`
-          : `<span class="task-label">${label}</span>`}
+        <button class="side-task" data-id="${task.id}"
+          title="${canPlace ? t('task.putFirst') : t('task.putOverlap')}">${label}</button>
         <button class="edit-btn" data-id="${task.id}" title="${t('task.editTip')}">✎</button>
         <button class="done-btn" data-id="${task.id}" title="${t('task.markDone')}">✓</button>
       </div>`;
@@ -190,7 +191,7 @@ export function initDayScreen(root) {
         </div>
         <label>${t('common.title')} <input id="e-title" value="${escapeHtml(task.title)}"></label>
         <div class="row">
-          <label>${t('task.duration')} <input id="e-dur" type="number" min="5" step="5" value="${task.durationMin}"></label>
+          <label>${t('task.duration')} <input id="e-dur" type="number" min="5" max="480" step="5" value="${task.durationMin}"></label>
           <label>${t('common.group')}
             <select id="e-group">${groupOptions(task.group)}</select>
           </label>
@@ -268,17 +269,6 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // Занятость дня без указанного дела — для проверки места при смене длительности.
-  // Рутины через practicesToBlocks: полночная практика разбита
-  function occupancyExcept(taskId) {
-    return [
-      ...practicesToBlocks(state.practices),
-      ...state.scheduled
-        .filter((x) => x.id !== taskId)
-        .map((x) => ({ start: x.scheduledStart, end: x.scheduledStart + x.durationMin, taskId: x.id })),
-    ];
-  }
-
   async function autoPlace() {
     const { date, routines, scheduled, unscheduled } = state;
     const occupancy = [
@@ -333,7 +323,7 @@ export function initDayScreen(root) {
         render();
       },
   
-    // растягивание дела: меняем длительность (шаг 5 мин, в границах модели 5–240)
+    // растягивание дела: меняем длительность (шаг 5 мин, в границах модели 5–480)
     eventResize: async (info) => {
       const { kind, taskId } = info.event.extendedProps;
       if (kind !== 'task') {
@@ -341,7 +331,7 @@ export function initDayScreen(root) {
         return;
       }
       const dur = Math.round((info.event.end - info.event.start) / 300000); // 5-мин интервалы
-      if (dur < 1 || dur > 48) {
+      if (dur < 1 || dur > 96) {
         info.revert();
         return;
       }
@@ -520,15 +510,8 @@ export function initDayScreen(root) {
         patch.scheduledDate = null;
         patch.scheduledStart = null;
       }
-      // при смене длительности место могло перестать подходить (себя не считаем)
-      if (patch.scheduledDate && patch.durationMin !== x.durationMin) {
-        const okFit = patch.scheduledStart != null
-          && canPlaceAt(occupancyExcept(x.id), patch.scheduledStart, patch.durationMin, x.id);
-        if (!okFit) {
-          patch.scheduledDate = null;
-          patch.scheduledStart = null;
-        }
-      }
+      // длительность может перестать влезать в окно — место сохраняется:
+      // перекрытие остаётся осознанным решением пользователя
       await updateTask(x.id, patch);
       editing = null;
       render();
@@ -607,7 +590,9 @@ export function initDayScreen(root) {
     if (side) {
       const task = state.unscheduled.find((x) => x.id === side.dataset.id);
       if (!task) return;
-      const w = state.windows.find((x) => x.end - x.start >= task.durationMin);
+      // влезающее — в первое подходящее окно; длиннее окон — в первое окно
+      // вообще, с перекрытием (оценка приблизительна)
+      const w = state.windows.find((x) => x.end - x.start >= task.durationMin) || state.windows[0];
       if (w) {
         await updateTask(task.id, { scheduledDate: state.date, scheduledStart: w.start });
         whatNow = null;

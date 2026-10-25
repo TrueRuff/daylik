@@ -112,7 +112,7 @@ describe('normalizeImport — проверка импортируемых дан
     expect(restored.practices[0].end).toBe(1440);
   });
 
-  it('длительность дела ограничивается диапазоном 5–240', () => {
+  it('длительность дела ограничивается диапазоном 5–480', () => {
     const restored = normalizeImport({
       tasks: [
         { id: 'a', title: 'A', group: 'Н', durationMin: 2 },
@@ -120,7 +120,7 @@ describe('normalizeImport — проверка импортируемых дан
       ],
     });
     expect(restored.tasks[0].durationMin).toBe(5);
-    expect(restored.tasks[1].durationMin).toBe(240);
+    expect(restored.tasks[1].durationMin).toBe(480);
   });
 
   it('отсутствующие ключи не ломают импорт', () => {
