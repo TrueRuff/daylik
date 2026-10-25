@@ -138,12 +138,12 @@ export function initDayScreen(root) {
             : `<p class="muted">${t('day.noTasks')}</p>`}
           <details class="done-box" ${done.length ? '' : ''}>
             <summary>${t('day.doneCount', { n: done.length })}</summary>
-            ${done.length
-              ? done.slice(0, 15).map((x) => `
-                <button class="done-item" data-id="${x.id}" title="${t('task.return')}">
-                  <span class="badge">${x.group}</span>${escapeHtml(x.title)}
-                </button>`).join('')
-              : `<p class="muted">${t('day.nothingDone')}</p>`}
+          ${done.length
+            ? done.slice(0, 15).map((task) => `
+              <button class="done-item" data-id="${task.id}" title="${t('task.return')}">
+                <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)}
+              </button>`).join('')
+            : `<p class="muted">${t('day.nothingDone')}</p>`}
           </details>
         </div>
       </div>`;
@@ -160,7 +160,7 @@ export function initDayScreen(root) {
 
   function taskRowHtml(task, canPlace) {
     const label = `
-      <span class="badge">${task.group}</span>${escapeHtml(task.title)}
+      <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)}
       <span class="muted">${task.durationMin} ${t('task.minutes')}${canPlace ? '' : ` — ${t('day.notFit')}`}</span>`;
     return `
       <div class="task-row${canPlace ? '' : ' dimmed'}">
@@ -272,9 +272,9 @@ export function initDayScreen(root) {
           <button id="picker-close" class="secondary">${t('common.close')}</button>
         </div>
         ${fitting.length
-          ? fitting.map((x) => `
-            <button class="pick-task" data-id="${x.id}" data-start="${w.start}">
-              <span class="badge">${x.group}</span>${escapeHtml(x.title)} <span class="muted">${x.durationMin} ${t('task.minutes')}</span>
+          ? fitting.map((task) => `
+            <button class="pick-task" data-id="${task.id}" data-start="${w.start}">
+              <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}</span>
             </button>`).join('')
           : `<p class="muted">${t('picker.noFit')}</p>`}
       </div>`;
