@@ -22,11 +22,10 @@ const screens = {
   log: document.getElementById('tab-log'),
 };
 
-const navEl = document.querySelector('nav');
-const mainEl = document.querySelector('main');
-const headerRow = document.querySelector('header div.row');
+const appEl = document.getElementById('app');
 const authRoot = document.getElementById('auth');
 const whoEl = document.getElementById('who');
+const avatarEl = document.getElementById('who-avatar');
 const logoutBtn = document.getElementById('logout');
 const langBtn = document.getElementById('lang');
 const logTabBtn = document.querySelector('nav button[data-tab="log"]');
@@ -61,11 +60,11 @@ function enterApp(acc) {
   account = acc;
   setDataOwner(acc.login); // дальнейшие чтения и записи — только его данные
   authRoot.hidden = true;
-  navEl.hidden = false;
-  mainEl.hidden = false;
-  headerRow.hidden = false;
+  appEl.hidden = false;
   whoEl.hidden = false;
   whoEl.textContent = acc.login;
+  avatarEl.hidden = false;
+  avatarEl.textContent = (acc.login[0] || '?').toUpperCase();
   logoutBtn.hidden = false;
   langBtn.hidden = false;
   themeBtn.hidden = false;
@@ -78,10 +77,9 @@ function showLogin() {
   account = null;
   setDataOwner(null);
   authRoot.hidden = false;
-  navEl.hidden = true;
-  mainEl.hidden = true;
-  headerRow.hidden = true;
+  appEl.hidden = true;
   whoEl.hidden = true;
+  avatarEl.hidden = true;
   logoutBtn.hidden = true;
   langBtn.hidden = true;
   authScreen.show();
@@ -132,8 +130,11 @@ function currentTheme() {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 }
 
+const SUN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>';
+const MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg>';
+
 function refreshThemeBtn() {
-  themeBtn.textContent = currentTheme() === 'dark' ? '☀' : '☾';
+  themeBtn.innerHTML = currentTheme() === 'dark' ? SUN_SVG : MOON_SVG;
 }
 
 themeBtn.addEventListener('click', () => {

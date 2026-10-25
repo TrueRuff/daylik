@@ -64,10 +64,12 @@ export function initDayScreen(root) {
     <div class="day-wrap">
       <div id="cal-wrap"><div id="cal"></div></div>
       <div class="side" id="side"></div>
-    </div>`;
+    </div>
+    <div id="day-modal" hidden></div>`;
 
   const topEl = root.querySelector('#day-top');
   const sideEl = root.querySelector('#side');
+  const modalEl = root.querySelector('#day-modal');
 
   // ---------- сбор данных и отрисовка ----------
 
@@ -116,9 +118,16 @@ export function initDayScreen(root) {
     currentEvents = eventsForRange(date, date, practices, scheduled);
     calendar?.refetchEvents();
 
+    // шапка дня: «Сегодня» + локализованная дата
+    const dateLabel = new Date().toLocaleDateString(getLang() === 'en' ? 'en-GB' : 'ru-RU',
+      { weekday: 'long', day: 'numeric', month: 'long' });
+
     topEl.innerHTML = `
-      <div class="row between">
-        <h2>${t('day.title')}</h2>
+      <div class="day-head">
+        <div>
+          <h2>${t('day.title')}</h2>
+          <p class="day-date">${dateLabel}</p>
+        </div>
         <button id="what-now" class="secondary">${t('day.whatNow')}</button>
       </div>
       <div class="row between">
@@ -143,9 +152,16 @@ export function initDayScreen(root) {
         <span>${t('day.overdue', { n: overdue.length })}</span>
         <button id="overdue-return" class="secondary">${t('day.overdueReturn')}</button>
       </div>` : ''}
-      ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}
-      ${editPractice !== null ? routineEditorHtml(editPractice === 'new' ? null : state.practices.find((p) => p.id === editPractice)) : ''}
-      ${editTask ? editCardHtml(editTask, spheres) : ''}`;
+      ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}`;
+
+    // карточки правки (дело, блок дня) живут в модальном окне поверх экрана
+    const modalHtml = editTask
+      ? editCardHtml(editTask, spheres)
+      : (editPractice !== null
+        ? routineEditorHtml(editPractice === 'new' ? null : state.practices.find((p) => p.id === editPractice))
+        : '');
+    modalEl.hidden = !modalHtml;
+    modalEl.innerHTML = modalHtml ? `<div class="modal-overlay"><div class="modal-card">${modalHtml}</div></div>` : '';
 
     sideEl.innerHTML = `
       <h3>${t('day.tasks')}</h3>
@@ -174,7 +190,7 @@ export function initDayScreen(root) {
     // с перекрытием (оценка времени приблизительна, это нормально)
     const label = taskLabel(task, canPlace ? '' : ` — ${t('day.notFit')}`);
     return `
-      <div class="task-row${canPlace ? '' : ' dimmed'}" data-id="${task.id}">
+      <div class="task-row${canPlace ? '' : ' dimmed'}" data-id="${task.id}" data-g="${task.group}">
         <button class="side-task" data-id="${task.id}"
           title="${canPlace ? t('task.putFirst') : t('task.putOverlap')}">${label}</button>
         <button class="edit-btn" data-id="${task.id}" title="${t('task.editTip')}">✎</button>
@@ -394,6 +410,13 @@ export function initDayScreen(root) {
   // ---------- обработчики ----------
 
   root.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+      editing = null;
+      editPractice = null;
+      render();
+      return;
+    }
+
     if (e.target.closest('#auto-place')) {
       await autoPlace();
       return;

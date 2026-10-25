@@ -11,6 +11,7 @@ export function initAuthScreen(root, onSuccess) {
   function render() {
     root.innerHTML = `
       <div class="auth-card">
+        <img class="auth-logo" src="icon-192.png" alt="">
         <h2>${t('app.name')}</h2>
         <p class="muted">${mode === 'login' ? t('auth.enter') : t('auth.register')}</p>
         <label>${t('auth.loginLabel')} <input id="a-login" autocomplete="username"></label>

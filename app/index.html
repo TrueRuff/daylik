@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#333a45" />
+    <meta name="theme-color" content="#f4f4f6" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" href="icon-192.png" />
     <link rel="apple-touch-icon" href="icon-192.png" />
@@ -20,31 +20,58 @@
     </script>
   </head>
   <body>
-    <header class="row between">
-      <h1><img class="logo" src="icon-192.png" alt=""><span data-i18n="app.name">Дейлик</span></h1>
-      <div class="row">
-        <span id="who" class="muted" hidden></span>
-        <button id="logout" class="secondary" data-i18n="auth.logout" hidden>Выйти</button>
-        <button id="lang" class="secondary" hidden>EN</button>
-        <button id="theme" class="secondary" data-i18n-title="theme.toggle" hidden>☾</button>
-        <button id="bell" class="secondary" data-i18n="bell.enable" hidden>Включить напоминания</button>
-      </div>
-    </header>
+    <div id="app" class="app" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <img class="logo" src="icon-192.png" alt="">
+          <span class="brand-name" data-i18n="app.name">Дейлик</span>
+        </div>
+        <nav>
+          <button data-tab="day">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+            <span data-i18n="nav.day">День</span>
+          </button>
+          <button data-tab="calendar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/></svg>
+            <span data-i18n="nav.calendar">Календарь</span>
+          </button>
+          <button data-tab="spheres">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.8l-1.8 4.6-4.6 1.8 1.8-4.6z"/></svg>
+            <span data-i18n="nav.spheres">Направления</span>
+          </button>
+          <button data-tab="input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>
+            <span data-i18n="nav.input">Ввод</span>
+          </button>
+          <button data-tab="log" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h.01M5 12h.01M5 18h.01M9.5 6H19M9.5 12H19M9.5 18H19"/></svg>
+            <span data-i18n="nav.log">Журнал</span>
+          </button>
+        </nav>
+        <div class="side-foot">
+          <div class="side-user">
+            <span id="who-avatar" class="avatar" hidden></span>
+            <span id="who" class="muted" hidden></span>
+            <button id="logout" class="secondary" data-i18n="auth.logout" hidden>Выйти</button>
+          </div>
+          <div class="side-tools">
+            <button id="lang" class="icon-btn" hidden>EN</button>
+            <button id="theme" class="icon-btn" data-i18n-title="theme.toggle" hidden>☾</button>
+            <button id="bell" class="icon-btn" data-i18n-title="bell.enable" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10 19a2.2 2.2 0 0 0 4 0"/></svg>
+            </button>
+          </div>
+        </div>
+      </aside>
+      <main>
+        <section id="tab-day" hidden></section>
+        <section id="tab-calendar" hidden></section>
+        <section id="tab-spheres" hidden></section>
+        <section id="tab-input" hidden></section>
+        <section id="tab-log" hidden></section>
+      </main>
+    </div>
     <section id="auth" class="auth-wrap"></section>
-    <nav hidden>
-      <button data-tab="day" data-i18n="nav.day">День</button>
-      <button data-tab="calendar" data-i18n="nav.calendar">Календарь</button>
-      <button data-tab="spheres" data-i18n="nav.spheres">Направления</button>
-      <button data-tab="input" data-i18n="nav.input">Ввод</button>
-      <button data-tab="log" data-i18n="nav.log" hidden>Журнал</button>
-    </nav>
-    <main hidden>
-      <section id="tab-day" hidden></section>
-      <section id="tab-calendar" hidden></section>
-      <section id="tab-spheres" hidden></section>
-      <section id="tab-input" hidden></section>
-      <section id="tab-log" hidden></section>
-    </main>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
