@@ -66,6 +66,7 @@ export function initInputScreen(root) {
           ${['task', 'routine', 'sphere'].map((k) =>
             `<button class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${t(`type.${k}`)}</button>`).join('')}
         </div>
+        <p class="muted">${t(`type.hint.${state.kind}`)}</p>
         <label>${t('common.title')} <input id="c-title" value="${escapeHtml(parsed.title)}"></label>
         <div class="row">
           ${t('common.group')}:

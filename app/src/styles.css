@@ -299,12 +299,12 @@ select { width: auto; min-width: 150px; }
 .practice-row .del-practice:hover,
 .del-free-practice:hover { color: #8c2c2c; opacity: 1; background: none; }
 
-/* ---------- день: таймлайн ---------- */
+/* ---------- день: таймлайн (лента Structured/Tiimo-стиля) ---------- */
 
 .day-wrap { display: grid; grid-template-columns: 1fr 292px; gap: 20px; align-items: start; }
 .timeline {
   position: relative;
-  height: 1152px; /* 24ч * 60мин * 0.8px */
+  height: 1440px; /* 24ч * 60мин * 1px */
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -314,57 +314,76 @@ select { width: auto; min-width: 150px; }
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px solid #f2f0ea;
-  font-size: 10px;
-  font-weight: 550;
-  color: #b8b4a9;
-  padding: 1px 0 0 8px;
+  border-top: 1px solid #f4f2ec;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #c4c0b6;
+  padding: 1px 0 0 6px;
   font-variant-numeric: tabular-nums;
+}
+/* время события: крупно слева, на уровне карточки */
+.tl-time {
+  position: absolute;
+  left: 6px;
+  width: 46px;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  transform: translateY(-2px);
+  z-index: 3;
+  background: var(--surface);
 }
 .tl-block {
   position: absolute;
-  left: 48px;
-  right: 10px;
+  left: 64px;
+  right: 12px;
   border-radius: var(--radius-sm);
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 550;
+  padding: 6px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  line-height: 1.25;
 }
 .tl-routine {
   background: #eaedf2;
   color: #333a46;
-  border-left: 3px solid #8d99ad;
+  border-left: 4px solid #8d99ad;
   cursor: pointer;
 }
 .tl-routine:hover { outline: 2px solid #8d99ad; }
 .tl-task {
-  background: #ecf2e8;
-  color: #243318;
-  border-left: 3px solid #6a9b52;
+  background: #eaf2e6;
+  color: #223318;
+  border-left: 4px solid #6a9b52;
   cursor: grab;
 }
 .tl-task:hover { outline: 2px solid #6a9b52; }
-.tl-done { float: right; color: #3e6330; font-weight: 700; cursor: pointer; }
+.tl-done { margin-left: auto; color: #3e6330; font-weight: 700; cursor: pointer; padding-left: 8px; }
 .tl-window {
   position: absolute;
-  left: 48px;
-  right: 10px;
+  left: 64px;
+  right: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   border-radius: var(--radius-sm);
-  border: 1px dashed #dcd9d0;
-  transition: background .15s, border-color .15s;
+  background: repeating-linear-gradient(45deg, #faf9f6, #faf9f6 6px, #f4f2ec 6px, #f4f2ec 12px);
+  transition: background .15s;
 }
-.tl-window:hover { background: #f6f4ef; border-color: #b8b4a9; }
+.tl-window:hover { background: #f1efe9; }
+.win-label { font-size: 12px; font-weight: 550; background: var(--surface); border-radius: 999px; padding: 2px 10px; }
 .win-add {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   color: var(--ink-soft);
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   line-height: 1;
   font-size: 17px;
   padding: 0;
@@ -373,11 +392,23 @@ select { width: auto; min-width: 150px; }
 .win-add:hover { background: var(--ink); border-color: var(--ink); color: #fff; opacity: 1; }
 .tl-now {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 56px;
+  right: 12px;
   border-top: 2px solid var(--now);
-  box-shadow: 0 0 8px rgba(208, 101, 101, .5);
   z-index: 2;
+}
+.tl-now span {
+  position: absolute;
+  right: 6px;
+  top: -11px;
+  background: var(--now);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  border-radius: 999px;
+  padding: 2px 10px;
+  box-shadow: 0 2px 8px rgba(208, 101, 101, .4);
+  font-variant-numeric: tabular-nums;
 }
 .timeline.drop-ok { outline: 2px solid var(--success); outline-offset: -2px; }
 .timeline.drop-bad { outline: 2px solid var(--danger); outline-offset: -2px; }

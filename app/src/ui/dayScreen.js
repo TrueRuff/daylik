@@ -14,7 +14,8 @@ import { Practice, Task } from '../core/models.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml, daysCheckboxes } from './dom.js';
 
-const PX_PER_MIN = 0.8;
+const PX_PER_MIN = 1;    // 1px в минуту: час = 60px, высота ленты 1440px
+const TIME_COL = 58;     // ширина колонки времени слева
 const DRAG_THRESHOLD = 6; // px, отличаем перетаскивание от клика
 const SNAP_MIN = 5;       // сетка таймлайна, минуты
 const ENERGY_KEY = 'daylik-energy';
@@ -88,7 +89,8 @@ export function initDayScreen(root) {
     const stats = dayStats(date, todo, done, practices);
     const fmt = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
 
-    state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices };
+    state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices,
+      sphereNames: Object.fromEntries(spheres.map((s) => [s.id, s.name])) };
 
     root.innerHTML = `
       <div class="row between">
@@ -124,7 +126,7 @@ export function initDayScreen(root) {
       <div class="day-wrap">
         <div class="timeline" id="timeline">
           ${hoursHtml()}
-          <div class="tl-now" style="top:${nowMinutes() * PX_PER_MIN}px"></div>
+          <div class="tl-now" style="top:${nowMinutes() * PX_PER_MIN}px"><span>${t('day.nowLabel')} ${minutesToTime(nowMinutes())}</span></div>
           ${blocks.map(blockHtml).join('')}
           ${windows.map(windowHtml).join('')}
         </div>
@@ -158,9 +160,11 @@ export function initDayScreen(root) {
     return html;
   }
 
-  // Общая подпись дела: бейдж группы, название, длительность (+ суффикс причины)
+  // Общая подпись дела: бейдж группы, название, длительность, метка направления
   const taskLabel = (task, suffix = '') =>
-    `<span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}${suffix}</span>`;
+    `<span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}`
+    + (task.sphereId && state.sphereNames[task.sphereId] ? ` · ${escapeHtml(state.sphereNames[task.sphereId])}` : '')
+    + `${suffix}</span>`;
 
   function taskRowHtml(task, canPlace) {
     const label = taskLabel(task, canPlace ? '' : ` — ${t('day.notFit')}`);
@@ -199,6 +203,10 @@ export function initDayScreen(root) {
           </select>
         </label>
         <label>${t('task.remind')} <input id="e-remind" type="datetime-local" value="${tsToLocalInput(task.dueAt)}"></label>
+        <label>${t('task.startTime')}
+          <input id="e-start" type="time" step="300" value="${task.scheduledDate === todayStr() && task.scheduledStart != null ? minutesToTime(task.scheduledStart) : ''}">
+          <span class="muted">${t('task.startTimeHint')}</span>
+        </label>
         <div class="row">
           <label>${t('repeat.label')}
             <select id="e-repeat">
@@ -224,12 +232,29 @@ export function initDayScreen(root) {
   }
 
   function blockHtml(b) {
-    const height = Math.max((b.end - b.start) * PX_PER_MIN, 16);
-    const attrs = b.kind === 'task' ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"` : ` data-practice="${b.id || ''}" title="${t('routine.edit')}"`;
+    const height = Math.max((b.end - b.start) * PX_PER_MIN, 22);
+    const top = b.start * PX_PER_MIN;
+    const time = `<div class="tl-time" style="top:${top}px">${minutesToTime(b.start)}</div>`;
+    const attrs = b.kind === 'task'
+      ? ` data-id="${b.taskId}" title="${t('task.removeFromDay')}"`
+      : ` data-practice="${b.id || ''}" title="${t('routine.edit')}"`;
     const done = b.kind === 'task' ? ` <span class="tl-done" data-id="${b.taskId}" title="${t('task.markDone')}">✓</span>` : '';
+    return `${time}
+      <div class="tl-block tl-${b.kind}"${attrs} style="top:${top}px;height:${height}px">
+        ${escapeHtml(b.label)}${done}
+      </div>`;
+  }
+
+  const fmtDur = (min) => (min >= 60 ? `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м` : `${min}м`);
+
+  function windowHtml(w) {
+    const height = Math.max((w.end - w.start) * PX_PER_MIN, 30);
+    const top = w.start * PX_PER_MIN;
     return `
-      <div class="tl-block tl-${b.kind}"${attrs} style="top:${b.start * PX_PER_MIN}px;height:${height}px">
-        ${minutesToTime(b.start)} ${escapeHtml(b.label)}${done}
+      <div class="tl-window" style="top:${top}px;height:${height}px">
+        <span class="win-label muted">${t('day.freeWindow', { time: fmtDur(w.end - w.start) })}</span>
+        <button class="win-add" data-start="${w.start}" data-end="${w.end}"
+          title="${t('task.putInto', { a: minutesToTime(w.start), b: minutesToTime(w.end) })}">+</button>
       </div>`;
   }
 
@@ -256,15 +281,6 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  function windowHtml(w) {
-    const height = Math.max((w.end - w.start) * PX_PER_MIN, 22);
-    return `
-      <div class="tl-window" style="top:${w.start * PX_PER_MIN}px;height:${height}px">
-        <button class="win-add" data-start="${w.start}" data-end="${w.end}"
-          title="${t('task.putInto', { a: minutesToTime(w.start), b: minutesToTime(w.end) })}">+</button>
-      </div>`;
-  }
-
   function pickerHtml(w, list) {
     const fitting = list.filter((x) => x.durationMin <= w.end - w.start);
     return `
@@ -273,9 +289,11 @@ export function initDayScreen(root) {
           <strong>${t('day.window')} ${minutesToTime(w.start)}–${minutesToTime(w.end)}</strong>
           <button id="picker-close" class="secondary">${t('common.close')}</button>
         </div>
+        <label>${t('picker.time')} <input id="pick-time" type="time" step="300" value="${minutesToTime(w.start)}"></label>
+        <p id="pick-msg" class="muted"></p>
         ${fitting.length
-          ? fitting.map((task) => `
-            <button class="pick-task" data-id="${task.id}" data-start="${w.start}">${taskLabel(task)}</button>`).join('')
+          ? fitting.map((x) => `
+            <button class="pick-task" data-id="${x.id}" data-start="${w.start}">${taskLabel(x)}</button>`).join('')
           : `<p class="muted">${t('picker.noFit')}</p>`}
       </div>`;
   }
@@ -558,10 +576,23 @@ export function initDayScreen(root) {
         repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
       };
       if (!patch.title) return;
-      // при смене длительности место на таймлайне могло перестать подходить
-      if (x.scheduledDate && patch.durationMin !== x.durationMin) {
+      // ручное время начала: указано — поставить на сегодня; очищено — снять
+      const startVal = root.querySelector('#e-start')?.value;
+      if (startVal) {
+        patch.scheduledDate = state.date;
+        patch.scheduledStart = timeToMinutes(startVal);
+      } else if (x.scheduledDate === state.date) {
         patch.scheduledDate = null;
         patch.scheduledStart = null;
+      }
+      // при смене длительности место могло перестать подходить (себя не считаем)
+      if (patch.scheduledDate && patch.durationMin !== x.durationMin) {
+        const okFit = patch.scheduledStart != null
+          && canPlaceAt(occupancyExcept(x.id), patch.scheduledStart, patch.durationMin, x.id);
+        if (!okFit) {
+          patch.scheduledDate = null;
+          patch.scheduledStart = null;
+        }
       }
       await updateTask(x.id, patch);
       editing = null;
@@ -624,7 +655,19 @@ export function initDayScreen(root) {
 
     const pick = e.target.closest('.pick-task');
     if (pick) {
-      await updateTask(pick.dataset.id, { scheduledDate: state.date, scheduledStart: Number(pick.dataset.start) });
+      // время из поля пикера (по умолчанию — начало окна); проверяем влезание
+      const timeVal = root.querySelector('#pick-time')?.value;
+      const start = timeVal ? timeToMinutes(timeVal) : Number(pick.dataset.start);
+      const task = state.allTasks.find((x) => x.id === pick.dataset.id);
+      const ok = task
+        && start >= picker.start
+        && start + task.durationMin <= picker.end;
+      if (!ok) {
+        const msg = root.querySelector('#pick-msg');
+        if (msg) msg.textContent = t('day.notFit');
+        return;
+      }
+      await updateTask(pick.dataset.id, { scheduledDate: state.date, scheduledStart: start });
       picker = null;
       whatNow = null;
       render();

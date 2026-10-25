@@ -5,6 +5,7 @@ import { Sphere, Practice } from '../core/models.js';
 import {
   getAllSpheres, saveSphere, deleteSphere,
   getPractices, savePractice, deletePractice,
+  getTasks, updateTask,
   exportAll, importAll,
 } from '../core/storage.js';
 import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
@@ -68,7 +69,7 @@ export function initSpheresScreen(root) {
       <p id="io-msg" class="muted"></p>`;
   }
 
-  function formHtml(sphere, practices, isNew) {
+  function formHtml(sphere, practices, isNew, tasks = []) {
     return `
       <div class="card">
         <h3>${isNew ? t('spheres.new') : escapeHtml(sphere.name)}</h3>
@@ -91,6 +92,14 @@ export function initSpheresScreen(root) {
         </div>
 
         ${isNew ? '' : `
+        <h4>${t('spheres.tasks')}</h4>
+        ${tasks.length ? tasks.map((x) => `
+          <div class="practice-row">
+            <span><span class="badge g-${x.group}">${x.group}</span>${escapeHtml(x.title)} <span class="muted">${x.durationMin} мин</span></span>
+            <span class="row">
+              <button class="area-task-done" data-id="${x.id}" title="${t('task.markDone')}">✓</button>
+            </span>
+          </div>`).join('') : `<p class="muted">${t('spheres.noTasks')}</p>`}
         <h4>${t('spheres.practices')}</h4>
         ${practices.length ? practices.map((p) => `
           <div class="practice-row">
@@ -112,14 +121,15 @@ export function initSpheresScreen(root) {
     if (!detail) return;
 
     if (!id) {
-      detail.innerHTML = formHtml(new Sphere({ id: '', name: '', group: 'П' }), [], true);
+      detail.innerHTML = formHtml(new Sphere({ id: '', name: '', group: 'П' }), [], true, []);
       return;
     }
     const spheres = await getAllSpheres();
     const sphere = spheres.find((s) => s.id === id);
     if (!sphere) return;
     const practices = (await getPractices()).filter((p) => p.sphereId === id);
-    detail.innerHTML = formHtml(sphere, practices, false);
+    const tasks = (await getTasks({ status: 'todo' })).filter((x) => x.sphereId === id);
+    detail.innerHTML = formHtml(sphere, practices, false, tasks);
     detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
@@ -288,6 +298,16 @@ export function initSpheresScreen(root) {
     if (e.target.classList.contains('del-free-practice')) {
       await deletePractice(e.target.dataset.id);
       await renderList();
+      return;
+    }
+
+    const areaDone = e.target.closest('.area-task-done');
+    if (areaDone) {
+      const tasks = await getTasks({ status: 'todo' });
+      const x = tasks.find((y) => y.id === areaDone.dataset.id);
+      if (x) await updateTask(x.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+      const addBtn = root.querySelector('#add-practice');
+      if (addBtn) await openDetail(addBtn.dataset.id);
       return;
     }
 
