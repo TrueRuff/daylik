@@ -64,7 +64,7 @@ export function initInputScreen(root) {
         <div class="row">
           ${t('common.type')}:
           ${['task', 'routine', 'sphere'].map((k) =>
-            `<button class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${t(`type.${k === 'task' ? 'once' : k === 'routine' ? 'recurring' : 'sphere'}`)}</button>`).join('')}
+            `<button class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${t(`type.${k}`)}</button>`).join('')}
         </div>
         <label>${t('common.title')} <input id="c-title" value="${escapeHtml(parsed.title)}"></label>
         <div class="row">

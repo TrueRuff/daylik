@@ -29,11 +29,10 @@ jobs:
         working-directory: app
       - run: npm run build
         working-directory: app
-        # Публичный Pages собирается без ключа LLM: разбор работает на правилах.
-        # Чтобы включить LLM: добавить секрет VITE_OPENROUTER_API_KEY в Settings →
-        # Secrets → Actions и раскомментировать env ниже.
-        # env:
-        #   VITE_OPENROUTER_API_KEY: ${{ secrets.VITE_OPENROUTER_API_KEY }}
+        # Ключ LLM берётся из секрета репозитория (Settings → Secrets → Actions,
+        # имя VITE_OPENROUTER_API_KEY). Без секрета сборка работает на правилах.
+        env:
+          VITE_OPENROUTER_API_KEY: ${{ secrets.VITE_OPENROUTER_API_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist

@@ -158,10 +158,12 @@ export function initDayScreen(root) {
     return html;
   }
 
+  // Общая подпись дела: бейдж группы, название, длительность (+ суффикс причины)
+  const taskLabel = (task, suffix = '') =>
+    `<span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}${suffix}</span>`;
+
   function taskRowHtml(task, canPlace) {
-    const label = `
-      <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)}
-      <span class="muted">${task.durationMin} ${t('task.minutes')}${canPlace ? '' : ` — ${t('day.notFit')}`}</span>`;
+    const label = taskLabel(task, canPlace ? '' : ` — ${t('day.notFit')}`);
     return `
       <div class="task-row${canPlace ? '' : ' dimmed'}">
         ${canPlace
@@ -273,9 +275,7 @@ export function initDayScreen(root) {
         </div>
         ${fitting.length
           ? fitting.map((task) => `
-            <button class="pick-task" data-id="${task.id}" data-start="${w.start}">
-              <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}</span>
-            </button>`).join('')
+            <button class="pick-task" data-id="${task.id}" data-start="${w.start}">${taskLabel(task)}</button>`).join('')
           : `<p class="muted">${t('picker.noFit')}</p>`}
       </div>`;
   }

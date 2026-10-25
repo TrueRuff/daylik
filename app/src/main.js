@@ -1,6 +1,7 @@
 // Точка входа: вкладки, экраны, цикл напоминаний, язык интерфейса
 
 import './styles.css';
+import '@fontsource-variable/inter';
 import { initDayScreen } from './ui/dayScreen.js';
 import { initSpheresScreen } from './ui/spheresScreen.js';
 import { initInputScreen } from './ui/inputScreen.js';

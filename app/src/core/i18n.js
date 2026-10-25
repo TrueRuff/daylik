@@ -44,8 +44,8 @@ export const DICTS = {
     'picker.noFit': 'Подходящих дел нет — все длиннее окна.',
 
     'common.type': 'Тип',
-    'type.once': 'Разовое',
-    'type.recurring': 'Регулярное',
+    'type.task': 'Разовое',
+    'type.routine': 'Регулярное',
     'type.sphere': 'Направление',
     'repeat.label': 'Повторять',
     'repeat.none': 'не повторяется',
@@ -175,8 +175,8 @@ export const DICTS = {
     'picker.noFit': 'No fitting tasks — all longer than the window.',
 
     'common.type': 'Type',
-    'type.once': 'One-off',
-    'type.recurring': 'Recurring',
+    'type.task': 'One-off',
+    'type.routine': 'Recurring',
     'type.sphere': 'Area',
     'repeat.label': 'Repeat',
     'repeat.none': 'never',
