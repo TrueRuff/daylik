@@ -4,6 +4,7 @@
    Селекторы генерируются JS-экранами — сверяться с ними. */
 
 :root {
+  color-scheme: light; /* нативные виджеты (списки, календарь) в цвет темы */
   --bg: #f4f4f6;
   --surface: #ffffff;
   --surface-soft: #f8f8fb;
@@ -39,6 +40,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --bg: #131417;
   --surface: #1b1d22;
   --ink: #e9e8e6;
@@ -77,6 +79,7 @@ body {
   color: var(--ink);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent; /* без серых вспышек на тапах */
 }
 
 ::selection { background: rgba(79, 70, 229, .18); }
@@ -188,6 +191,16 @@ h2 { margin-top: 0; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
 h3 { font-size: 15px; font-weight: 650; }
 .muted { color: var(--ink-soft); font-size: 13.5px; }
 
+/* появление вкладки при переключении (клик или свайп) */
+main > section.screen-in { animation: screen-in .22s ease; }
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  main > section.screen-in, .modal-card { animation: none; }
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -209,6 +222,7 @@ button {
   font-family: var(--font);
   font-size: 13.5px;
   font-weight: 600;
+  touch-action: manipulation; /* без двойного тапа-зума и задержки */
   transition: background .15s, color .15s, border-color .15s, opacity .15s;
 }
 button:hover { background: var(--accent-hover); border-color: var(--accent-hover); opacity: 1; }
@@ -257,6 +271,7 @@ input[type='datetime-local'] {
   border-radius: var(--radius-sm);
   font-family: var(--font);
   color: var(--ink);
+  background: var(--surface);
 }
 select { width: auto; min-width: 150px; }
 
@@ -742,35 +757,64 @@ select { width: auto; min-width: 150px; }
 
 [hidden] { display: none !important; }
 
-/* ---------- узкие экраны: сайдбар сверху ---------- */
+/* ---------- узкие экраны: сайдбар сверху, крупные цели касания ---------- */
 
 @media (max-width: 900px) {
   .app { flex-direction: column; }
+  /* два ряда: логотип + инструменты, ниже — прокручиваемые вкладки */
   .sidebar {
     width: 100%;
     height: auto;
-    position: static;
+    position: sticky; /* навигация всегда под рукой при скролле */
+    top: 0;
+    z-index: 20;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 4px;
-    padding: 10px 14px;
+    gap: 4px 10px;
+    padding: 10px 12px 6px;
     border-right: none;
     border-bottom: 1px solid var(--line);
   }
-  .brand { padding: 0 8px 0 0; }
+  .brand { padding: 0; }
   .brand-name { display: none; }
-  nav { flex-direction: row; overflow-x: auto; flex: 1; }
-  nav button { flex: none; padding: 7px 12px; }
   .side-foot { margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: 8px; }
   .side-user #who { display: none; }
-  .side-user #logout { margin-left: 0; }
+  .side-user #logout { margin-left: 0; padding: 8px 14px; }
   .side-tools { border-top: none; padding-top: 0; }
-  main { padding: 16px 14px 60px; }
-  h2 { font-size: 20px; }
+  .icon-btn { width: 42px; height: 40px; }
+  nav {
+    order: 3;
+    flex-basis: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 2px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* вкладки листаются пальцем без полосы */
+  }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { flex: none; min-height: 44px; padding: 9px 16px; font-size: 14px; }
+
+  main { padding: 16px 14px 70px; }
+  h2 { font-size: 21px; }
   .sphere-cols, .day-wrap { grid-template-columns: 1fr; }
   .day-wrap { gap: 14px; }
-  .side { position: static; }
-  .side { order: -1; } /* дела важнее пустого таймлайна на телефоне */
-  button { min-height: 38px; }
+  .side { position: static; order: -1; } /* дела важнее пустого таймлайна */
+
+  /* всё, во что попадает палец, — не мельче ~44px; поля 16px, чтобы
+     iOS не зумил при фокусе */
+  button { min-height: 44px; }
+  .edit-btn, .done-btn { width: 44px; font-size: 16px; }
+  .energy { padding: 8px 16px; }
+  .example { padding: 8px 14px; }
+  .icon-btn { font-size: 16px; }
+  input, select, textarea { font-size: 16px; }
+  .day { font-size: 14px; }
+  .day input { width: 18px; height: 18px; }
+  #quick-save { width: 48px; }
+  .practice-row { padding: 12px 0; }
+  .modal-overlay { padding: 5vh 10px 16px; }
+  .fc { font-size: 12.5px; }
   .input-row { flex-wrap: nowrap; }
 }

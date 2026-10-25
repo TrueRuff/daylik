@@ -45,7 +45,16 @@ let account = null; // вошедший аккаунт (auth.js)
 function showTab(name) {
   currentTab = name;
   for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
-  buttons.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  const shown = screens[name];
+  shown.classList.remove('screen-in');
+  void shown.offsetWidth; // перезапуск анимации при повторном показе
+  shown.classList.add('screen-in');
+  buttons.forEach((b) => {
+    const on = b.dataset.tab === name;
+    b.classList.toggle('active', on);
+    // на телефоне лента вкладок прокручивается к активной (свайп мог увести)
+    if (on) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  });
   document.dispatchEvent(new CustomEvent('tab-shown', { detail: name }));
 }
 
@@ -53,6 +62,32 @@ buttons.forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.tab === 'log' && !isAdmin(account)) return; // журнал — только админу
   showTab(b.dataset.tab);
 }));
+
+// Свайпы на телефоне: горизонтальный жест листает вкладки. Жесты, нужные
+// самим экранам (календарь, перетаскивание дел, поля ввода), исключены.
+const SWIPE_MIN = 70;
+let swipe = null;
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1 || !e.target.closest) { swipe = null; return; }
+  if (e.target.closest('.fc, nav, .task-row, .sphere-item, .modal-overlay, input, textarea, select')) {
+    swipe = null;
+    return;
+  }
+  swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  if (!swipe) return;
+  const dx = e.changedTouches[0].clientX - swipe.x;
+  const dy = e.changedTouches[0].clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 2) return;
+  const tabs = [...buttons].filter((b) => !b.hidden).map((b) => b.dataset.tab);
+  const i = tabs.indexOf(currentTab);
+  const next = tabs[i + (dx < 0 ? 1 : -1)];
+  if (next) showTab(next);
+}, { passive: true });
 
 // ---------- вход и выход ----------
 
@@ -135,6 +170,9 @@ const MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
 function refreshThemeBtn() {
   themeBtn.innerHTML = currentTheme() === 'dark' ? SUN_SVG : MOON_SVG;
+  // строка заголовка Android (PWA) следует за темой приложения
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = currentTheme() === 'dark' ? '#131417' : '#f4f4f6';
 }
 
 themeBtn.addEventListener('click', () => {
