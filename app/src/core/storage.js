@@ -22,27 +22,66 @@ db.version(3).stores({
   logs: '++id, time, level',
 });
 
+// v4: аккаунты + владелец у данных (разделение по учётным записям).
+// Существующие записи достаются встроенному админу — данные автора не теряются.
+db.version(4).stores({
+  accounts: 'login',
+  spheres: 'id, name, group, owner',
+  tasks: 'id, sphereId, group, status, dueAt, owner',
+  practices: 'id, sphereId, owner',
+}).upgrade(async (tx) => {
+  for (const name of ['spheres', 'tasks', 'practices']) {
+    await tx.table(name).toCollection().modify((row) => { row.owner = 'админ'; });
+  }
+});
+
+// Логин вошедшего аккаунта; null — фильтр выключен (до входа и в тестах)
+let dataOwner = null;
+
+export function setDataOwner(login) {
+  dataOwner = login;
+}
+
+// Записи видимого владельца; без владельца (null) видно всё
+function isOwned(row) {
+  return dataOwner == null || row.owner === dataOwner;
+}
+
+function stampOwner(row) {
+  if (dataOwner != null) row.owner = dataOwner;
+  return row;
+}
+
+// ---------- аккаунты ----------
+
+export async function getAccount(login) {
+  return db.accounts.get(login);
+}
+
+export async function putAccount(account) {
+  await db.accounts.put(account);
+  return account;
+}
+
 export async function saveSphere(sphere) {
-  await db.spheres.put(sphere);
+  await db.spheres.put(stampOwner(sphere));
   return sphere;
 }
 
 export async function saveTask(task) {
-  await db.tasks.put(task);
+  await db.tasks.put(stampOwner(task));
   return task;
 }
 
 export async function getAllSpheres() {
-  const rows = await db.spheres.toArray();
+  const rows = await db.spheres.filter(isOwned).toArray();
   return rows.map((r) => new Sphere(r));
 }
 
 export async function getTasks({ status = null, group = null } = {}) {
-  let col = db.tasks;
-  if (status || group) {
-    col = col.filter((t) => (!status || t.status === status) && (!group || t.group === group));
-  }
-  const rows = await col.toArray();
+  const rows = await db.tasks
+    .filter((t) => isOwned(t) && (!status || t.status === status) && (!group || t.group === group))
+    .toArray();
   return rows.map((r) => new Task(r));
 }
 
@@ -78,17 +117,17 @@ export async function completeTask(task) {
 // Задачи с наступившим временем напоминания.
 // Фильтр по месту: в IndexedDB null меньше числа и попал бы в выборку belowThanOrEqual.
 export async function getDueReminders(now) {
-  const rows = await db.tasks.filter((t) => t.dueAt && t.dueAt <= now && t.status !== 'done').toArray();
+  const rows = await db.tasks.filter((t) => isOwned(t) && t.dueAt && t.dueAt <= now && t.status !== 'done').toArray();
   return rows.map((r) => new Task(r));
 }
 
 export async function savePractice(practice) {
-  await db.practices.put(practice);
+  await db.practices.put(stampOwner(practice));
   return practice;
 }
 
 export async function getPractices() {
-  const rows = await db.practices.toArray();
+  const rows = await db.practices.filter(isOwned).toArray();
   return rows.map((r) => new Practice(r));
 }
 
@@ -102,27 +141,36 @@ export async function deleteSphere(id) {
   await db.practices.where('sphereId').equals(id).delete();
 }
 
-// Экспорт/импорт всех данных (см. serialization.js)
+// Экспорт/импорт данных (см. serialization.js); без владельца — все записи,
+// после входа — только данные текущего аккаунта
 export async function exportAll() {
   const data = {
-    spheres: await db.spheres.toArray(),
-    tasks: await db.tasks.toArray(),
-    practices: await db.practices.toArray(),
+    spheres: (await db.spheres.toArray()).filter(isOwned),
+    tasks: (await db.tasks.toArray()).filter(isOwned),
+    practices: (await db.practices.toArray()).filter(isOwned),
   };
   log.info('storage.export', { spheres: data.spheres.length, tasks: data.tasks.length, practices: data.practices.length });
   return data;
 }
 
-// Импорт с полной заменой текущих данных; возвращает очищенные записи
+// Импорт с заменой данных текущего владельца (или всех, пока входа не было);
+// возвращает очищенные записи
 export async function importAll(data) {
   const clean = normalizeImport(data);
+  const stamp = (rows) => rows.map((r) => stampOwner({ ...r }));
   await db.transaction('rw', db.spheres, db.tasks, db.practices, async () => {
-    await db.spheres.clear();
-    await db.tasks.clear();
-    await db.practices.clear();
-    await db.spheres.bulkAdd(clean.spheres);
-    await db.tasks.bulkAdd(clean.tasks);
-    await db.practices.bulkAdd(clean.practices);
+    if (dataOwner != null) {
+      await db.spheres.where('owner').equals(dataOwner).delete();
+      await db.tasks.where('owner').equals(dataOwner).delete();
+      await db.practices.where('owner').equals(dataOwner).delete();
+    } else {
+      await db.spheres.clear();
+      await db.tasks.clear();
+      await db.practices.clear();
+    }
+    await db.spheres.bulkAdd(stamp(clean.spheres));
+    await db.tasks.bulkAdd(stamp(clean.tasks));
+    await db.practices.bulkAdd(stamp(clean.practices));
   });
   log.info('storage.import', { spheres: clean.spheres.length, tasks: clean.tasks.length, practices: clean.practices.length });
   return clean;
@@ -134,6 +182,7 @@ export async function __clearForTests() {
   await db.tasks.clear();
   await db.practices.clear();
   await db.logs.clear();
+  await db.accounts.clear();
 }
 
 // Журнал: записи пишутся в таблицу logs, хвост длиннее LOG_CAP подрезается

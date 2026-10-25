@@ -2,12 +2,13 @@
 // завершение повторяющихся дел и каскадное удаление.
 
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   saveSphere, saveTask, savePractice,
   getAllSpheres, getTasks, getPractices,
   updateTask, deleteTask, deleteSphere,
   getDueReminders, completeTask, initLog, getLogs, importAll,
+  setDataOwner,
 } from '../src/core/storage.js';
 import { Sphere, Task, Practice } from '../src/core/models.js';
 
@@ -17,6 +18,46 @@ const task = (id, over = {}) => new Task({ id, title: `Дело ${id}`, group: '
 beforeEach(async () => {
   const storage = await import('../src/core/storage.js');
   await storage.__clearForTests();
+});
+
+describe('разделение данных по аккаунтам', () => {
+  afterEach(() => setDataOwner(null));
+
+  it('запись штампуется владельцем, выборка видит только его', async () => {
+    setDataOwner('bob');
+    await saveTask(task('t1'));
+    setDataOwner('alice');
+    await saveTask(task('t2'));
+
+    setDataOwner('bob');
+    expect((await getTasks()).map((x) => x.id)).toEqual(['t1']);
+    setDataOwner('alice');
+    expect((await getTasks()).map((x) => x.id)).toEqual(['t2']);
+    setDataOwner(null);
+    expect((await getTasks()).length).toBe(2); // без входа фильтра нет
+  });
+
+  it('напоминания не протекают между аккаунтами', async () => {
+    setDataOwner('bob');
+    await saveTask(task('t1', { dueAt: 1000 }));
+    setDataOwner('alice');
+    expect(await getDueReminders(2000)).toEqual([]);
+    setDataOwner('bob');
+    expect((await getDueReminders(2000)).map((x) => x.id)).toEqual(['t1']);
+  });
+
+  it('импорт заменяет данные только текущего владельца', async () => {
+    setDataOwner('bob');
+    await saveTask(task('t1'));
+    setDataOwner('alice');
+    await saveTask(task('t2'));
+
+    const data = { spheres: [], tasks: [{ id: 'n1', title: 'Новое', group: 'Ж', durationMin: 30 }], practices: [] };
+    await importAll(data);
+    expect((await getTasks()).map((x) => x.id)).toEqual(['n1']);
+    setDataOwner('bob');
+    expect((await getTasks()).map((x) => x.id)).toEqual(['t1']);
+  });
 });
 
 describe('CRUD', () => {

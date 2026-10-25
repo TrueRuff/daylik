@@ -65,8 +65,8 @@ describe('все ключи словаря используются', () => {
     const html = readFileSync(join(appRoot, 'index.html'), 'utf8');
     for (const m of html.matchAll(/data-i18n(?:-title|-placeholder)?="([^"]+)"/g)) used.add(m[1]);
 
-    // ключи, собираемые динамически по префиксу
-    const dyn = ['group.', 'level.', 'energy.', 'kind.', 'provider.', 'type.', 'schedule.'];
+    // ключи, собираемые динамически по префиксу (auth.* — коды ошибок из auth.js)
+    const dyn = ['auth.', 'group.', 'level.', 'energy.', 'kind.', 'provider.', 'type.', 'schedule.'];
     const dead = Object.keys(DICTS.ru).filter(
       (k) => !used.has(k) && !dyn.some((p) => k.startsWith(p)) && k !== 'dayNames'
     );

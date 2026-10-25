@@ -4,13 +4,14 @@ export const GROUPS = ['Н', 'Ж', 'П']; // Необходимо / Желате
 // названия групп — в словаре локализации (i18n.js), ключи group.Н / group.Ж / group.П
 
 export class Sphere {
-  constructor({ id, name, group, brief = '', details = '', createdAt = Date.now() }) {
+  constructor({ id, name, group, brief = '', details = '', createdAt = Date.now(), owner = null }) {
     this.id = id;
     this.name = name;
     this.group = group;
     this.brief = brief;   // краткий текст — перечитывается каждый день
     this.details = details; // полный текст: методы, рутина
     this.createdAt = createdAt;
+    this.owner = owner;   // логин аккаунта-владельца (auth.js)
   }
 }
 
@@ -30,6 +31,7 @@ export class Task {
     notes = '',
     createdAt = Date.now(),
     source = 'manual', // rules | llm | manual
+    owner = null,
   }) {
     this.id = id;
     this.sphereId = sphereId;
@@ -45,18 +47,20 @@ export class Task {
     this.notes = notes;
     this.createdAt = createdAt;
     this.source = source;
+    this.owner = owner;
   }
 }
 
 // Регулярная практика направления (сон, тренировки, пары); в интерфейсе Sphere — «Направление»
 export class Practice {
-  constructor({ id, sphereId = null, title, days = [1, 2, 3, 4, 5, 6, 7], start = 540, end = 600 }) {
+  constructor({ id, sphereId = null, title, days = [1, 2, 3, 4, 5, 6, 7], start = 540, end = 600, owner = null }) {
     this.id = id;
     this.sphereId = sphereId;
     this.title = title;
     this.days = days;   // дни недели 1..7, 1 = понедельник
     this.start = start; // минуты от 00:00
     this.end = end;     // может быть меньше start — практика через полночь
+    this.owner = owner;
   }
 }
 

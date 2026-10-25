@@ -13,17 +13,20 @@
     <header class="row between">
       <h1><img class="logo" src="icon-192.png" alt=""><span data-i18n="app.name">Дейлик</span></h1>
       <div class="row">
-        <button id="lang" class="secondary">EN</button>
-        <button id="bell" class="secondary" data-i18n="bell.enable">Включить напоминания</button>
+        <span id="who" class="muted" hidden></span>
+        <button id="logout" class="secondary" data-i18n="auth.logout" hidden>Выйти</button>
+        <button id="lang" class="secondary" hidden>EN</button>
+        <button id="bell" class="secondary" data-i18n="bell.enable" hidden>Включить напоминания</button>
       </div>
     </header>
-    <nav>
+    <section id="auth" class="auth-wrap"></section>
+    <nav hidden>
       <button data-tab="day" data-i18n="nav.day">День</button>
-      <button data-tab="spheres" data-i18n="nav.spheres">Сферы</button>
+      <button data-tab="spheres" data-i18n="nav.spheres">Направления</button>
       <button data-tab="input" data-i18n="nav.input">Ввод</button>
-      <button data-tab="log" data-i18n="nav.log">Журнал</button>
+      <button data-tab="log" data-i18n="nav.log" hidden>Журнал</button>
     </nav>
-    <main>
+    <main hidden>
       <section id="tab-day" hidden></section>
       <section id="tab-spheres" hidden></section>
       <section id="tab-input" hidden></section>

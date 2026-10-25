@@ -604,3 +604,21 @@ select { width: auto; min-width: 150px; }
 }
 
 .tl-ico { opacity: .55; margin-right: 7px; font-weight: 400; font-size: 12px; }
+
+/* ---------- вход в аккаунт ---------- */
+
+[hidden] { display: none !important; }
+
+.auth-wrap { max-width: 380px; margin: 9vh auto 0; padding: 0 16px; }
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  padding: 26px 24px;
+}
+.auth-card h2 { margin: 0; font-size: 21px; letter-spacing: -.02em; }
+.auth-card p { margin: 4px 0 8px; }
+.auth-card button { width: 100%; margin-top: 6px; }
+.auth-error { color: var(--danger); font-weight: 550; }
+#who { font-weight: 550; padding: 0 8px 0 0; }
