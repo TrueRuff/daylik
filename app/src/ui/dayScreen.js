@@ -317,7 +317,8 @@ export function initDayScreen(root) {
       nowIndicator: true,
       snapDuration: '00:05:00',
       events: (info, success) => success(currentEvents),
-      editable: true,
+      editable: true,   // перенос и ресайз стоящих событий
+      droppable: true,  // приём дел, перетянутых из колонки (eventReceive)
   
       // перенос дела: сохраняем новое время начала
       eventDrop: async (info) => {
@@ -332,18 +333,18 @@ export function initDayScreen(root) {
         render();
       },
   
-      // растягивание дела: меняем длительность (шаг 5 мин)
-      eventResize: async (info) => {
-        const { kind, taskId } = info.event.extendedProps;
-        if (kind !== 'task') {
-          info.revert();
-          return;
-        }
-        const dur = Math.round((info.event.end - info.event.start) / 300000);
-        if (dur < 5 || dur > 480) {
-          info.revert();
-          return;
-        }
+    // растягивание дела: меняем длительность (шаг 5 мин, в границах модели 5–240)
+    eventResize: async (info) => {
+      const { kind, taskId } = info.event.extendedProps;
+      if (kind !== 'task') {
+        info.revert();
+        return;
+      }
+      const dur = Math.round((info.event.end - info.event.start) / 300000); // 5-мин интервалы
+      if (dur < 1 || dur > 48) {
+        info.revert();
+        return;
+      }
         await updateTask(taskId, { durationMin: dur * 5 });
         whatNow = null;
         render();
