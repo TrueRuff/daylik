@@ -18,7 +18,7 @@ import {
 import { eventsForRange, GROUP_COLORS } from '../core/calendarEvents.js';
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
-import { t, getLang } from '../core/i18n.js';
+import { t, getLang, onChange } from '../core/i18n.js';
 import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
 
 const ENERGY_KEY = 'daylik-energy';
@@ -297,80 +297,90 @@ export function initDayScreen(root) {
 
   // ---------- календарь FullCalendar ----------
 
-  calendar = new Calendar(root.querySelector('#cal'), {
-    plugins: [timeGridPlugin],
-    initialView: 'timeGridDay',
-    locale: getLang() === 'en' ? enLocale : ruLocale,
-    headerToolbar: false,
-    allDaySlot: false,
-    slotMinTime: '00:00:00',
-    slotMaxTime: '24:00:00',
-    slotDuration: '00:30:00',
-    slotLabelInterval: '01:00:00',
-    dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' },
-    height: 780,
-    scrollTime: minutesToTime(Math.max(0, nowMinutes() - 90)),
-    nowIndicator: true,
-    snapDuration: '00:05:00',
-    events: (info, success) => success(currentEvents),
-    editable: true,
-
-    // перенос дела: сохраняем новое время начала
-    eventDrop: async (info) => {
-      const { kind, taskId } = info.event.extendedProps;
-      if (kind !== 'task') {
-        info.revert();
-        return;
-      }
-      const start = info.event.start;
-      await updateTask(taskId, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
-      whatNow = null;
-      render();
-    },
-
-    // растягивание дела: меняем длительность (шаг 5 мин)
-    eventResize: async (info) => {
-      const { kind, taskId } = info.event.extendedProps;
-      if (kind !== 'task') {
-        info.revert();
-        return;
-      }
-      const dur = Math.round((info.event.end - info.event.start) / 300000);
-      if (dur < 5 || dur > 480) {
-        info.revert();
-        return;
-      }
-      await updateTask(taskId, { durationMin: dur * 5 });
-      whatNow = null;
-      render();
-    },
-
-    // клик по событию: дело — карточка редактирования, рутина — редактор блока
-    eventClick: (info) => {
-      const { kind, taskId, practiceId } = info.event.extendedProps;
-      if (kind === 'task') {
-        editing = taskId;
-        pickerToTop();
-      } else if (practiceId) {
-        editPractice = practiceId;
-        pickerToTop();
-      }
-      render();
-    },
-
-    // бросок из колонки дел: ставим дело на полученное время
-    eventReceive: async (info) => {
-      const id = info.draggedEl.dataset.id;
-      info.event.remove();
-      const start = info.event.start;
-      if (id && start) {
-        await updateTask(id, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
+  // Локаль — единственная опция, которую нельзя менять на лету: при смене
+  // языка календарь пересоздаётся (события подтянутся через events-функцию)
+  function buildCalendar() {
+    calendar?.destroy();
+    calendar = new Calendar(root.querySelector('#cal'), {
+      plugins: [timeGridPlugin],
+      initialView: 'timeGridDay',
+      locale: getLang() === 'en' ? enLocale : ruLocale,
+      headerToolbar: false,
+      allDaySlot: false,
+      slotMinTime: '00:00:00',
+      slotMaxTime: '24:00:00',
+      slotDuration: '00:30:00',
+      slotLabelInterval: '01:00:00',
+      dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' },
+      height: 780,
+      scrollTime: minutesToTime(Math.max(0, nowMinutes() - 90)),
+      nowIndicator: true,
+      snapDuration: '00:05:00',
+      events: (info, success) => success(currentEvents),
+      editable: true,
+  
+      // перенос дела: сохраняем новое время начала
+      eventDrop: async (info) => {
+        const { kind, taskId } = info.event.extendedProps;
+        if (kind !== 'task') {
+          info.revert();
+          return;
+        }
+        const start = info.event.start;
+        await updateTask(taskId, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
         whatNow = null;
-      }
-      render();
-    },
-  });
-  calendar.render();
+        render();
+      },
+  
+      // растягивание дела: меняем длительность (шаг 5 мин)
+      eventResize: async (info) => {
+        const { kind, taskId } = info.event.extendedProps;
+        if (kind !== 'task') {
+          info.revert();
+          return;
+        }
+        const dur = Math.round((info.event.end - info.event.start) / 300000);
+        if (dur < 5 || dur > 480) {
+          info.revert();
+          return;
+        }
+        await updateTask(taskId, { durationMin: dur * 5 });
+        whatNow = null;
+        render();
+      },
+  
+      // клик по событию: дело — карточка редактирования, рутина — редактор блока
+      eventClick: (info) => {
+        const { kind, taskId, practiceId } = info.event.extendedProps;
+        if (kind === 'task') {
+          editing = taskId;
+          pickerToTop();
+        } else if (practiceId) {
+          editPractice = practiceId;
+          pickerToTop();
+        }
+        render();
+      },
+  
+      // бросок из колонки дел: ставим дело на полученное время
+      eventReceive: async (info) => {
+        const id = info.draggedEl.dataset.id;
+        info.event.remove();
+        const start = info.event.start;
+        if (id && start) {
+          await updateTask(id, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
+          whatNow = null;
+        }
+        render();
+      },
+    });
+    calendar.render();
+  }
+
+  buildCalendar();
+  // смена языка пересоздаёт календарь с новой локалью (main.js перерисует
+  // активный экран, события подтянутся заново через events-функцию)
+  onChange(() => buildCalendar());
 
   // дела из колонки тянутся в календарь (FullCalendar Draggable)
   new Draggable(sideEl, {
