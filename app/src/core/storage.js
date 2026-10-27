@@ -52,6 +52,31 @@ function stampOwner(row) {
   return row;
 }
 
+// демо-данные (помечены demo при создании из demoData.js)
+
+const TABLES = () => [db.spheres, db.tasks, db.practices];
+
+export async function hasDemoData() {
+  for (const table of TABLES()) {
+    const rows = await table.filter((x) => x.demo && isOwned(x)).toArray();
+    if (rows.length) return true;
+  }
+  return false;
+}
+
+export async function deleteDemoData() {
+  let removed = 0;
+  for (const table of TABLES()) {
+    const rows = await table.filter((x) => x.demo && isOwned(x)).toArray();
+    if (rows.length) {
+      await table.bulkDelete(rows.map((x) => x.id));
+      removed += rows.length;
+    }
+  }
+  if (removed) log.info('demo.cleared', { removed });
+  return removed;
+}
+
 // аккаунты
 
 export async function getAccount(login) {

@@ -8,6 +8,7 @@ import {
   getPractices, savePractice, deletePractice,
   getTasks, updateTask, saveTask,
   exportAll, importAll,
+  hasDemoData, deleteDemoData,
 } from '../core/storage.js';
 import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
 import { toIcs } from '../core/ics.js';
@@ -46,7 +47,9 @@ export function initSpheresScreen(root) {
 
   async function renderList() {
     const spheres = await getAllSpheres();
-    const [allPractices, todoTasks] = await Promise.all([getPractices(), getTasks({ status: 'todo' })]);
+    const [allPractices, todoTasks, demo] = await Promise.all([
+      getPractices(), getTasks({ status: 'todo' }), hasDemoData(),
+    ]);
     const freePractices = allPractices.filter((p) => !p.sphereId);
     // счётчики содержимого направления — видны прямо в колонке
     const taskCount = {};
@@ -97,6 +100,7 @@ export function initSpheresScreen(root) {
         <button id="import-data" class="secondary">${t('data.import')}</button>
         <input id="import-file" type="file" accept=".json,.daylik" hidden>
       </div>
+      ${demo ? `<div class="row"><button id="demo-reset" class="secondary">${t('data.demoReset')}</button></div>` : ''}
       <p id="io-msg" class="muted"></p>`;
   }
 
@@ -411,6 +415,15 @@ export function initSpheresScreen(root) {
     }
     if (e.target.id === 'import-data') {
       root.querySelector('#import-file').click();
+      return;
+    }
+
+    if (e.target.id === 'demo-reset') {
+      if (!confirm(t('data.demoConfirm'))) return;
+      await deleteDemoData();
+      await renderList(); // сначала перерисовка, потом сообщение — иначе его сотрёт
+      ioMessage(t('data.demoRemoved'));
+      document.dispatchEvent(new CustomEvent('data-changed'));
       return;
     }
 

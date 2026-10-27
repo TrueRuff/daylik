@@ -11,6 +11,7 @@ import { initAuthScreen } from './ui/authScreen.js';
 import { startReminderLoop, fireNotification, requestPermission } from './core/reminders.js';
 import { getDueReminders, updateTask, initLog, setDataOwner } from './core/storage.js';
 import { restoreSession, logout as authLogout, isAdmin } from './core/auth.js';
+import { seedDemoIfEmpty } from './core/demoData.js';
 import { log } from './core/log.js';
 import { getLang, setLang, onChange, applyStatic, t } from './core/i18n.js';
 
@@ -98,7 +99,7 @@ document.addEventListener('touchend', (e) => {
 
 // вход и выход
 
-function enterApp(acc) {
+async function enterApp(acc) {
   account = acc;
   setDataOwner(acc.login); // дальнейшие чтения и записи — только его данные
   authRoot.hidden = true;
@@ -113,6 +114,8 @@ function enterApp(acc) {
   themeBtn.hidden = false;
   logTabBtn.hidden = !isAdmin(acc);
   refreshBell();
+  // в пустой аккаунт — демо-день второй смены (убирается кнопкой на «Направлениях»)
+  await seedDemoIfEmpty();
   showTab('day');
 }
 

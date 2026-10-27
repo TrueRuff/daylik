@@ -135,6 +135,9 @@ export const DICTS = {
     'data.unreadable': 'Не удалось прочитать файл: формат не распознан.',
     'data.imported': 'Данные импортированы.',
     'data.confirm': 'Файл: {s} сфер, {t} дел, {p} практик.\nТекущие данные будут заменены. Продолжить?',
+    'data.demoReset': 'Убрать тестовые данные',
+    'data.demoConfirm': 'Убрать тестовое расписание и примеры дел?\nСвои данные останутся.',
+    'data.demoRemoved': 'Тестовые данные убраны.',
 
     'input.title': 'Добавить',
     'input.intro': 'Опиши задуманное своими словами — приложение предложит тип и группу, остаётся подтвердить.',
@@ -295,6 +298,9 @@ export const DICTS = {
     'data.unreadable': 'Could not read the file: unknown format.',
     'data.imported': 'Data imported.',
     'data.confirm': 'File: {s} spheres, {t} tasks, {p} practices.\nCurrent data will be replaced. Continue?',
+    'data.demoReset': 'Remove sample data',
+    'data.demoConfirm': 'Remove the sample schedule and example tasks?\nYour own data stays.',
+    'data.demoRemoved': 'Sample data removed.',
 
     'input.title': 'Add',
     'input.intro': 'Describe what you have in mind in your own words — the app will suggest a type and a group, you just confirm.',
