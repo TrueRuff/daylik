@@ -6,7 +6,7 @@ import {
   saveTask, getTasks, getAllSpheres, getPractices,
   hasDemoData, deleteDemoData, setDataOwner, __clearForTests,
 } from '../src/core/storage.js';
-import { seedDemoIfEmpty } from '../src/core/demoData.js';
+import { seedOnLogin } from '../src/core/demoData.js';
 import { Task } from '../src/core/models.js';
 
 beforeEach(async () => {
@@ -18,7 +18,7 @@ afterEach(() => setDataOwner(null));
 
 describe('демо-набор дня', () => {
   it('пустой аккаунт получает рутины, направления и дела', async () => {
-    expect(await seedDemoIfEmpty()).toBe(true);
+    expect(await seedOnLogin()).toBe('full');
     const [spheres, practices, tasks] = await Promise.all([
       getAllSpheres(), getPractices(), getTasks(),
     ]);
@@ -32,20 +32,26 @@ describe('демо-набор дня', () => {
     }
   });
 
-  it('непустой аккаунт не сидируется', async () => {
+  it('непустому аккаунту добавляются базовые дела, но один раз', async () => {
     await saveTask(new Task({ id: 'own', title: 'моё дело', group: 'Н' }));
-    expect(await seedDemoIfEmpty()).toBe(false);
-    expect((await getTasks()).length).toBe(1);
+    expect(await seedOnLogin()).toBe('tasks');
+    const tasks = await getTasks();
+    // своё дело осталось + три базовых
+    expect(tasks.length).toBe(4);
+    expect(tasks.some((x) => x.title === 'моё дело' && !x.demo)).toBe(true);
+    // повторный вход ничего не добавляет
+    expect(await seedOnLogin()).toBe(false);
+    expect((await getTasks()).length).toBe(4);
   });
 
   it('повторный вызов ничего не дублирует', async () => {
-    await seedDemoIfEmpty();
-    expect(await seedDemoIfEmpty()).toBe(false);
+    await seedOnLogin();
+    expect(await seedOnLogin()).toBe(false);
     expect((await getAllSpheres()).length).toBe(3);
   });
 
   it('сброс удаляет демо-записи и оставляет свои', async () => {
-    await seedDemoIfEmpty();
+    await seedOnLogin();
     await saveTask(new Task({ id: 'own', title: 'моё дело', group: 'Н' }));
     expect(await hasDemoData()).toBe(true);
 

@@ -21,10 +21,10 @@ function buildSections() {
     {
       img: 'onboarding/add.png',
       title: t('onb.add.title'),
-      markers: [[64, 25], [38, 35], [49, 48], [48, 59], [40, 71], [49, 76]],
+      markers: [[64, 25], [38, 35], [50, 35], [49, 53], [84, 67], [36, 76], [49, 81]],
       items: [
-        t('onb.add.1'), t('onb.add.2'), t('onb.add.3'), t('onb.add.4'),
-        t('onb.add.5'), t('onb.add.6'),
+        t('onb.add.1'), t('onb.add.2'), t('onb.add.2b'), t('onb.add.3'),
+        t('onb.add.4'), t('onb.add.5'), t('onb.add.6'),
       ],
     },
     {

@@ -1,6 +1,7 @@
-// демо-набор для нового аккаунта: пример дня второй смены — рутины,
-// направления и дела, чтобы экран дня не встречал пустотой.
-// записи помечены demo: true и убираются кнопкой «Убрать тестовые данные».
+// демо-набор: пример дня второй смены — рутины, направления и дела.
+// пустому аккаунту при входе достаётся полный набор, непустому — только
+// базовые разовые дела (один раз). записи помечены demo: true и убираются
+// кнопкой «Убрать тестовые данные».
 
 import { Sphere, Practice, Task } from './models.js';
 import { getAllSpheres, getPractices, getTasks, saveSphere, savePractice, saveTask } from './storage.js';
@@ -30,25 +31,45 @@ function makePractices(sphereId) {
   ];
 }
 
-function makeTasks(sphereId) {
+// базовые разовые дела — примеры для любого аккаунта при первом входе;
+// убираются кнопкой «Убрать тестовые данные»
+function baseTasks() {
   return [
-    new Task({ id: crypto.randomUUID(), title: 'сделать уроки на 60 минут', group: 'П', sphereId: sphereId['Школа'], durationMin: 60, source: 'manual', demo: true }),
-    new Task({ id: crypto.randomUUID(), title: 'погулять на 30 минут', group: 'Ж', sphereId: sphereId['Отдых'], durationMin: 30, source: 'manual', demo: true }),
-    new Task({ id: crypto.randomUUID(), title: 'вынести мусор на 10 минут', group: 'Н', sphereId: sphereId['Дом'], durationMin: 10, source: 'manual', demo: true }),
+    new Task({ id: crypto.randomUUID(), title: 'сделать уроки на 60 минут', group: 'П', durationMin: 60, source: 'manual', demo: true }),
+    new Task({ id: crypto.randomUUID(), title: 'погулять на 30 минут', group: 'Ж', durationMin: 30, source: 'manual', demo: true }),
+    new Task({ id: crypto.randomUUID(), title: 'вынести мусор на 10 минут', group: 'Н', durationMin: 10, source: 'manual', demo: true }),
   ];
 }
 
-// сидируется только полностью пустой аккаунт — свои данные никогда не трогаем
-export async function seedDemoIfEmpty() {
-  const [allSpheres, allPractices, allTasks] = await Promise.all([getAllSpheres(), getPractices(), getTasks()]);
-  if (allSpheres.length || allPractices.length || allTasks.length) return false;
+function makeTasks(sphereId) {
+  const sphereFor = {
+    'сделать уроки на 60 минут': sphereId['Школа'],
+    'погулять на 30 минут': sphereId['Отдых'],
+    'вынести мусор на 10 минут': sphereId['Дом'],
+  };
+  return baseTasks().map((t) => new Task({ ...t, sphereId: sphereFor[t.title] ?? null }));
+}
 
-  const saved = makeSpheres();
-  for (const s of saved) await saveSphere(s);
-  const byName = Object.fromEntries(saved.map((s) => [s.name, s.id]));
-  const practices = makePractices(byName);
-  for (const p of practices) await savePractice(p);
-  for (const t of makeTasks(byName)) await saveTask(t);
-  log.info('demo.seeded', { spheres: saved.length, practices: practices.length, tasks: 3 });
-  return true;
+// при входе: пустому аккаунту — полный демо-день, остальным — базовые дела
+// (один раз, пока не удалят кнопкой); свои данные не трогаем
+export async function seedOnLogin() {
+  const [allSpheres, allPractices, allTasks] = await Promise.all([getAllSpheres(), getPractices(), getTasks()]);
+  const hasDemoTask = allTasks.some((x) => x.demo);
+
+  if (!allSpheres.length && !allPractices.length && !allTasks.length) {
+    const saved = makeSpheres();
+    for (const s of saved) await saveSphere(s);
+    const byName = Object.fromEntries(saved.map((s) => [s.name, s.id]));
+    const practices = makePractices(byName);
+    for (const p of practices) await savePractice(p);
+    for (const t of makeTasks(byName)) await saveTask(t);
+    log.info('demo.seeded', { spheres: saved.length, practices: practices.length, tasks: 3 });
+    return 'full';
+  }
+  if (!hasDemoTask) {
+    for (const t of baseTasks()) await saveTask(t);
+    log.info('demo.baseTasks', { n: 3 });
+    return 'tasks';
+  }
+  return false;
 }

@@ -3,14 +3,10 @@
 // (отдельного экрана ввода больше нет).
 
 import { categorize } from '../core/categorize.js';
-import { Task, Sphere, Practice } from '../core/models.js';
-import { saveTask, saveSphere, savePractice, getAllSpheres } from '../core/storage.js';
-import { timeToMinutes } from '../core/schedule.js';
+import { Task, Sphere } from '../core/models.js';
+import { saveTask, saveSphere, getAllSpheres } from '../core/storage.js';
 import { t, onChange } from '../core/i18n.js';
-import {
-  escapeHtml, daysCheckboxes, timeRangeFields, bindTimeMasks, normalizeTimeValue,
-  remindFieldsHtml, handleRemindClick, readRemindInput,
-} from './dom.js';
+import { escapeHtml, bindTimeMasks, remindFieldsHtml, handleRemindClick, readRemindInput } from './dom.js';
 
 let root = null;      // контейнер модалки, живёт на странице
 let state = null;     // текущий разбор (после «Разобрать»)
@@ -28,16 +24,40 @@ function providerTitle(parsed) {
 // иконки типов: выбор по узнаванию, без чтения подписей
 const TYPE_ICONS = {
   task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"/></svg>',
-  routine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>',
+  ongoing: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>',
   sphere: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.8l-1.8 4.6-4.6 1.8 1.8-4.6z"/></svg>',
 };
 
 // поля, зависящие от типа: при смене типа перерисовывается только этот блок,
-// кнопки типов/группы и набранный текст остаются на месте (без мерцания)
+// кнопки типов/группы и набранный текст остаются на месте (без мерцания).
+// «Продолжительное» — дело с повтором (проект по 30 минут в день); рутины
+// (сон, готовка) создаются не здесь, а на «Направлениях».
 function extraHtml() {
-  if (state.kind === 'routine') {
-    return `${timeRangeFields()}
-      <div class="days">${daysCheckboxes()}</div>`;
+  if (state.kind === 'ongoing') {
+    const def = state.parsed.durationMin || 30;
+    return `
+      <div class="row">
+        <label>${t('task.duration')} <input id="c-dur" type="number" min="5" step="5" value="${def}"></label>
+      </div>
+      <div class="chips">
+        ${[10, 20, 30, 60].map((m) => `<button type="button" class="grp chip${m === def ? ' on' : ''}" data-dur="${m}">${m}</button>`).join('')}
+      </div>
+      <div class="row">
+        <label>${t('repeat.label')}
+          <select id="c-repeat">
+            <option value="daily">${t('repeat.daily')}</option>
+            <option value="weekly">${t('repeat.weekly')}</option>
+            <option value="every">${t('repeat.every')}</option>
+          </select>
+        </label>
+        <label id="c-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="c-repeat-n" type="number" min="2" max="30" value="3"></label>
+      </div>
+      <label>${t('common.sphere')}
+        <select id="c-sphere">
+          <option value="">${t('task.noSphere')}</option>
+          ${state.spheres.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </label>`;
   }
   if (state.kind !== 'task') return '';
   const def = state.parsed.durationMin || 30;
@@ -82,7 +102,7 @@ function confirmCardHtml() {
       </div>
       <div class="row">
         ${t('common.type')}:
-        ${['task', 'routine', 'sphere'].map((k) =>
+        ${['task', 'ongoing', 'sphere'].map((k) =>
           `<button type="button" class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${TYPE_ICONS[k]}${t(`type.${k}`)}</button>`).join('')}
       </div>
       <p class="muted" id="c-hint">${t(`type.hint.${state.kind}`)}</p>
@@ -184,7 +204,9 @@ async function parse() {
   const text = rawEl.value.trim();
   if (!text) return;
   const [parsed, spheres] = await Promise.all([categorize(text), getAllSpheres()]);
-  state = { parsed, kind: parsed.kind, rawText: text, group: parsed.group || 'П', spheres };
+  // рутина из разбора — это продолжительное дело; сами рутины создаются на «Направлениях»
+  const kind = parsed.kind === 'routine' ? 'ongoing' : parsed.kind;
+  state = { parsed, kind, rawText: text, group: parsed.group || 'П', spheres };
   render();
   root.querySelector('#raw')?.focus();
 }
@@ -199,21 +221,13 @@ async function save() {
   if (state.kind === 'sphere') {
     await saveSphere(new Sphere({ id, name: title, group: state.group }));
     savedMsg = t('spheres.saved', { title });
-  } else if (state.kind === 'routine') {
-    const days = [...confirmEl.querySelectorAll('.days input:checked')].map((c) => Number(c.dataset.day));
-    await savePractice(new Practice({
-      id,
-      title,
-      days,
-      start: timeToMinutes(normalizeTimeValue(confirmEl.querySelector('.js-start').value) || '09:00'),
-      end: timeToMinutes(normalizeTimeValue(confirmEl.querySelector('.js-end').value) || '10:00'),
-    }));
-    savedMsg = t('routine.saved', { title });
   } else {
     const dur = Number(confirmEl.querySelector('#c-dur').value) || 30;
     const sphereId = confirmEl.querySelector('#c-sphere')?.value || null;
     const repeatKind = confirmEl.querySelector('#c-repeat').value;
     const repeatN = Number(confirmEl.querySelector('#c-repeat-n')?.value) || 3;
+    // продолжительное дело — то же разовое, но с повтором; после завершения
+    // возвращается по расписанию (recurring)
     await saveTask(new Task({
       id,
       rawText,
@@ -221,13 +235,16 @@ async function save() {
       group: state.group,
       durationMin: dur,
       sphereId,
-      dueAt: readRemindInput(root, 'c'),
+      dueAt: state.kind === 'task' ? readRemindInput(root, 'c') : null,
       status: 'todo',
       source: state.parsed.provider,
-      repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
+      repeatRule: state.kind === 'ongoing'
+        ? (repeatKind === 'every' ? `every:${repeatN}` : 'daily')
+        : (repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null)),
     }));
     const remindDate = root.querySelector('#c-remind-date')?.value;
-    savedMsg = t('task.saved', { title, group: state.group }) + (remindDate ? ` ${t('task.willRemind')}` : '');
+    savedMsg = t('task.saved', { title, group: state.group })
+      + (state.kind === 'task' && remindDate ? ` ${t('task.willRemind')}` : '');
   }
   state = null;
   render();

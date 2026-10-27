@@ -227,7 +227,7 @@ export function initDayScreen(root) {
 
   // общая подпись дела: бейдж группы, название, длительность, метка направления
   const taskLabel = (task, suffix = '') =>
-    `<span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}`
+    `<span class="badge g-${task.group}">${task.group}</span>${task.repeatRule ? '<span class="routine-mark">↻</span>' : ''}${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}`
     + (task.sphereId && state.sphereNames[task.sphereId] ? ` · ${escapeHtml(state.sphereNames[task.sphereId])}` : '')
     + `${suffix}</span>`;
 
@@ -845,7 +845,7 @@ export function initDayScreen(root) {
 
     const parsed = await categorize(text);
     if (parsed.kind !== 'task') {
-      msg.textContent = t('day.quickKindHint');
+      msg.textContent = parsed.kind === 'routine' ? t('day.quickRoutineHint') : t('day.quickSphereHint');
       return;
     }
     await saveTask(new Task({

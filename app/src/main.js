@@ -11,7 +11,7 @@ import { initAuthScreen } from './ui/authScreen.js';
 import { startReminderLoop, fireNotification, requestPermission } from './core/reminders.js';
 import { getDueReminders, updateTask, initLog, setDataOwner } from './core/storage.js';
 import { restoreSession, logout as authLogout, isAdmin } from './core/auth.js';
-import { seedDemoIfEmpty } from './core/demoData.js';
+import { seedOnLogin } from './core/demoData.js';
 import { openOnboarding } from './ui/onboarding.js';
 import { log } from './core/log.js';
 import { getLang, setLang, onChange, applyStatic, t } from './core/i18n.js';
@@ -125,10 +125,10 @@ async function enterApp(acc) {
   themeBtn.hidden = false;
   logTabBtn.hidden = !isAdmin(acc);
   refreshBell();
-  // в пустой аккаунт — демо-день второй смены (убирается кнопкой на «Направлениях»);
-  // отказ сидирования не должен мешать входу
+  // в пустой аккаунт — демо-день второй смены, в остальные — базовые дела
+  // (убираются кнопкой на «Направлениях»); отказ сидирования не мешает входу
   try {
-    await seedDemoIfEmpty();
+    await seedOnLogin();
   } catch (err) {
     log.warn('demo.seedFailed', { message: err?.message });
   }
