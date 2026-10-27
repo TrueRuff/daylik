@@ -462,7 +462,7 @@ export function initDayScreen(root) {
     if (card) {
       const block = state?.blocks.find((b) => b.taskId === card.dataset.task);
       if (!block) return;
-      gesture = { type: 'move', id: block.taskId, startY: e.clientY, startMin: block.start,
+      gesture = { type: 'move', id: block.taskId, startX: e.clientX, startY: e.clientY, startMin: block.start,
         durMin: block.end - block.start, moved: false, card };
     } else {
       const side = e.target.closest('.side-task');
@@ -497,7 +497,11 @@ export function initDayScreen(root) {
       gesture.newStart = ns;
       gesture.card.style.transform = `translateY(${(ns - gesture.startMin) * DRAG_PX_PER_MIN}px)`;
       gesture.card.style.opacity = '.85';
-      dragBubble(`${minutesToTime(ns)}–${minutesToTime(ns + gesture.durMin)}`);
+      // курсор над колонкой дел — дело вернётся из расписания в дела
+      const overSide = Boolean(document.elementFromPoint(e.clientX, e.clientY)?.closest('.side'));
+      gesture.toSide = overSide;
+      sideEl.classList.toggle('drop-col', overSide);
+      dragBubble(overSide ? t('day.backToTasks') : `${minutesToTime(ns)}–${minutesToTime(ns + gesture.durMin)}`);
     } else {
       gesture.ghost.style.left = `${e.clientX}px`;
       gesture.ghost.style.top = `${e.clientY}px`;
@@ -518,7 +522,12 @@ export function initDayScreen(root) {
       g.card.style.transform = '';
       g.card.style.opacity = '';
       dragBubble(null);
-      if (g.newStart !== undefined && g.newStart !== g.startMin) {
+      sideEl.classList.remove('drop-col');
+      if (g.toSide) {
+        // бросили в колонку дел — снять с расписания
+        await updateTask(g.id, { scheduledDate: null, scheduledStart: null });
+        whatNow = null;
+      } else if (g.newStart !== undefined && g.newStart !== g.startMin) {
         await updateTask(g.id, { scheduledStart: g.newStart });
         whatNow = null;
       }
@@ -549,6 +558,7 @@ export function initDayScreen(root) {
       dragBubble(null);
     }
     gesture.ghost?.remove();
+    sideEl.classList.remove('drop-col');
     document.querySelectorAll('#tl-list .drop-row').forEach((r) => r.classList.remove('drop-row'));
     gesture = null;
   });

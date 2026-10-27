@@ -474,7 +474,7 @@ select { width: auto; min-width: 150px; }
 .task-row[data-g='П'] { --task-c: var(--g-use); }
 .task-row .side-task:hover { border-color: var(--line-strong); border-left-color: var(--task-c, var(--line-strong)); background: var(--surface-soft); opacity: 1; }
 .task-row.dimmed { opacity: .55; }
-.task-row .side-task { touch-action: none; cursor: grab; }
+.task-row .side-task { touch-action: none; cursor: grab; user-select: none; }
 .side-task, .pick-task {
   display: block;
   width: 100%;
