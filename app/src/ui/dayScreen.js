@@ -14,7 +14,7 @@ import {
 import { GROUP_COLORS } from '../core/calendarEvents.js';
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
-import { t, getLang, onChange } from '../core/i18n.js';
+import { t, getLang } from '../core/i18n.js';
 import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields, timeSelect } from './dom.js';
 
 const ENERGY_KEY = 'daylik-energy';
@@ -22,10 +22,6 @@ const WELCOME_KEY = 'daylik-welcome';
 
 const PX_PER_MIN = 64 / 60; // высота часа таймлайна, px
 const MINUTES = 1440;
-
-function fmtTime(min) {
-  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(Math.round(min) % 60).padStart(2, '0')}`;
-}
 
 // Раскладка пересекающихся блоков по «дорожкам»: кластеры перекрытий
 // нумеруются отдельно, дорожек в кластере — сколько нужно
@@ -118,6 +114,9 @@ export function initDayScreen(root) {
   // ---------- сбор данных и отрисовка ----------
 
   async function render() {
+    // набранный, но не отправленный текст быстрого ввода переживает перерисовку
+    const quickVal = root.querySelector('#quick-add')?.value || '';
+
     const date = todayStr();
     const practices = (await getPractices()).filter((p) => practiceAppliesOn(p, todayWeekday()));
 
@@ -210,6 +209,8 @@ export function initDayScreen(root) {
         <button id="overdue-return" class="secondary">${t('day.overdueReturn')}</button>
       </div>` : ''}
       ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}`;
+    const qa = root.querySelector('#quick-add');
+    if (qa && quickVal) qa.value = quickVal;
 
     // карточки правки (дело, блок дня) и выбор дела на время живут в модальном окне
     const modalHtml = editTask
@@ -357,12 +358,12 @@ export function initDayScreen(root) {
       const style = `top:${top}px;height:${height}px;left:${left}%;width:calc(${width}% - 8px)`;
       if (b.kind === 'routine') {
         return `<div class="tl-card routine" data-practice="${b.id}" style="${style}">
-          <span class="tl-time">${fmtTime(b.start)}–${fmtTime(Math.min(b.end, MINUTES))}</span>
+          <span class="tl-time">${minutesToTime(b.start)}–${minutesToTime(Math.min(b.end, MINUTES))}</span>
           <span class="tl-title">↻ ${escapeHtml(b.label)}</span>
         </div>`;
       }
       return `<div class="tl-card task" data-task="${b.taskId}" data-g="${b.group}" style="${style};background:${GROUP_COLORS[b.group] ?? 'var(--accent)'}">
-        <span class="tl-time">${fmtTime(b.start)}–${fmtTime(Math.min(b.end, MINUTES))}</span>
+        <span class="tl-time">${minutesToTime(b.start)}–${minutesToTime(Math.min(b.end, MINUTES))}</span>
         <span class="tl-title">${escapeHtml(b.label)}</span>
         <span class="tl-resize" data-resize="${b.taskId}"></span>
       </div>`;
@@ -385,7 +386,7 @@ export function initDayScreen(root) {
     return `
       <div class="card">
         <div class="row between">
-          <strong>${t('day.placeAt', { time: fmtTime(startMin) })}</strong>
+          <strong>${t('day.placeAt', { time: minutesToTime(startMin) })}</strong>
           <button id="pick-close" class="secondary">${t('common.close')}</button>
         </div>
         ${list.length ? list.map((x) => `
@@ -513,9 +514,6 @@ export function initDayScreen(root) {
       render();
     }
   });
-
-  // смена языка перерисовывает экран целиком (main.js)
-  onChange(() => render());
 
   function pickerToTop() {
     root.closest('main')?.scrollTo?.({ top: 0, behavior: 'smooth' });

@@ -268,7 +268,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 textarea { resize: vertical; }
 input[type='number'],
-input[type='time'],
 input[type='datetime-local'] {
   padding: 9px 12px;
   border: 1px solid var(--line-strong);
@@ -493,7 +492,7 @@ select { width: auto; min-width: 150px; }
   color: var(--ink-soft);
 }
 .task-row { display: flex; gap: 6px; margin: 6px 0; }
-.task-row .side-task, .task-label {
+.task-row .side-task {
   flex: 1;
   text-align: left;
   background: var(--surface);
@@ -512,7 +511,6 @@ select { width: auto; min-width: 150px; }
 .task-row[data-g='Ж'] { --task-c: var(--g-want); }
 .task-row[data-g='П'] { --task-c: var(--g-use); }
 .task-row .side-task:hover { border-color: var(--line-strong); border-left-color: var(--task-c, var(--line-strong)); background: var(--surface-soft); opacity: 1; }
-.task-label { color: var(--ink-soft); font-weight: 450; border: none; padding: 0; background: none; }
 .task-row.dimmed { opacity: .55; }
 .task-row .side-task { touch-action: none; cursor: grab; }
 .side-task, .pick-task {
