@@ -36,6 +36,12 @@ addBtn.addEventListener('click', openAddModal);
 
 initLog();
 
+// необработанные ошибки и rejection'ы — в журнал: иначе сбой обработчика
+// интерфейса не оставляет следов и не попадает в «Журнал» для отладки
+const reportError = (message) => log.error('app.unhandled', { message });
+window.addEventListener('error', (e) => reportError(e.message));
+window.addEventListener('unhandledrejection', (e) => reportError(String(e.reason)));
+
 initDayScreen(screens.day);
 initCalendarScreen(screens.calendar);
 initSpheresScreen(screens.spheres);
@@ -114,8 +120,13 @@ async function enterApp(acc) {
   themeBtn.hidden = false;
   logTabBtn.hidden = !isAdmin(acc);
   refreshBell();
-  // в пустой аккаунт — демо-день второй смены (убирается кнопкой на «Направлениях»)
-  await seedDemoIfEmpty();
+  // в пустой аккаунт — демо-день второй смены (убирается кнопкой на «Направлениях»);
+  // отказ сидирования не должен мешать входу
+  try {
+    await seedDemoIfEmpty();
+  } catch (err) {
+    log.warn('demo.seedFailed', { message: err?.message });
+  }
   showTab('day');
 }
 

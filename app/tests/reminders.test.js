@@ -60,3 +60,17 @@ describe('fireNotification', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('startReminderLoop — устойчивость', () => {
+  it('отказ getDueReminders не выбрасывает необработанный rejection', async () => {
+    const { startReminderLoop } = await import('../src/core/reminders.js');
+    let calls = 0;
+    const stop = startReminderLoop(async () => {
+      calls += 1;
+      throw new Error('база недоступна');
+    }, () => {}, 5);
+    await new Promise((r) => setTimeout(r, 40));
+    stop();
+    expect(calls).toBeGreaterThan(0);
+  });
+});

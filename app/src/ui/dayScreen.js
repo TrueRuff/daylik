@@ -96,7 +96,10 @@ export function initDayScreen(root) {
 
   // сбор данных и отрисовка
 
+  let renderGen = 0; // счётчик отрисовок: устаревшая (параллельная) не трогает DOM
+
   async function render() {
+    const gen = ++renderGen;
     // набранный, но не отправленный текст быстрого ввода переживает перерисовку
     const quickVal = root.querySelector('#quick-add')?.value || '';
 
@@ -129,6 +132,8 @@ export function initDayScreen(root) {
         group: x.group,
       })),
     ].sort((a, b) => a.start - b.start);
+    // пока читали базу, началась более свежая отрисовка — эту бросаем
+    if (gen !== renderGen) return;
 
     const windows = computeFreeWindows(blocks);
     const fits = (x) => windows.some((w) => w.end - w.start >= x.durationMin);
@@ -323,7 +328,7 @@ export function initDayScreen(root) {
         <div class="row between">
           <span>${t('day.whatNowHint', {
             b: minutesToTime(rec.end),
-            title: rec.task.title,
+            title: escapeHtml(rec.task.title),
             dur: rec.task.durationMin,
           })}</span>
           <button id="whatnow-close" class="secondary">${t('common.close')}</button>

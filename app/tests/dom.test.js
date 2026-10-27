@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml } from '../src/ui/dom.js';
+import { escapeHtml, normalizeTimeValue } from '../src/ui/dom.js';
 
 describe('escapeHtml', () => {
   it('экранирует все опасные символы', () => {
@@ -12,5 +12,22 @@ describe('escapeHtml', () => {
   it('обычный текст не меняет, числа приводит к строке', () => {
     expect(escapeHtml('позвонить маме')).toBe('позвонить маме');
     expect(escapeHtml(30)).toBe('30');
+  });
+});
+
+describe('normalizeTimeValue', () => {
+  it('дополняет и ограничивает введённые цифры', () => {
+    expect(normalizeTimeValue('930')).toBe('09:30');
+    expect(normalizeTimeValue('930', )).toBe('09:30');
+    expect(normalizeTimeValue('0930')).toBe('09:30');
+    expect(normalizeTimeValue('7')).toBe('07:00');
+    expect(normalizeTimeValue('2459')).toBe('23:59');
+  });
+
+  it('двоеточие и мусор игнорируются, пусто остаётся пустым', () => {
+    expect(normalizeTimeValue('9:30')).toBe('09:30');
+    expect(normalizeTimeValue('')).toBe('');
+    expect(normalizeTimeValue(null)).toBe('');
+    expect(normalizeTimeValue('abc')).toBe('');
   });
 });

@@ -2,17 +2,21 @@
 // становятся событиями с началом и длительностью. RFC 5545: строки через CRLF,
 // спецсимволы экранируются, даты в базовом формате YYYYMMDDTHHMMSS.
 
-import { minutesToTime } from './schedule.js';
+import { minutesToTime, addDays } from './schedule.js';
 
+// дата+минуты -> 'YYYYMMDDTHHMMSS'; минуты за полночь переносятся на следующий день
 function icsDate(dateStr, minutes) {
-  const [y, m, d] = dateStr.split('-');
-  const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
-  const mm = String(minutes % 60).padStart(2, '0');
+  const dayShift = Math.floor(minutes / 1440);
+  const rest = minutes - dayShift * 1440;
+  const base = dayShift ? addDays(dateStr, dayShift) : dateStr;
+  const [y, m, d] = base.split('-');
+  const hh = String(Math.floor(rest / 60)).padStart(2, '0');
+  const mm = String(rest % 60).padStart(2, '0');
   return `${y}${m}${d}T${hh}${mm}00`;
 }
 
 function esc(s) {
-  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r/g, '\\r').replace(/\n/g, '\\n');
 }
 
 // folding: строки длиннее 75 октетов продолжаются с пробела
@@ -44,7 +48,7 @@ export function toIcs(tasks, opts = {}) {
     if (!t.scheduledDate) continue;
     lines.push(
       'BEGIN:VEVENT',
-      `UID:${t.id}@daylik`,
+      `UID:${esc(t.id)}@daylik`,
       `DTSTAMP:${stamp}`,
       `DTSTART:${icsDate(t.scheduledDate, t.scheduledStart || 0)}`,
       `DTEND:${icsDate(t.scheduledDate, (t.scheduledStart || 0) + t.durationMin)}`,

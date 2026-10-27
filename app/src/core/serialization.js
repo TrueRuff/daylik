@@ -220,11 +220,15 @@ export function normalizeImport(obj) {
     const n = Math.round(Number(v));
     return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
   };
+  // id попадает в html-атрибуты (data-id, value) и в UID ics — оставляем
+  // только безопасные токены; записи с кавычками, скобками или чрезмерной
+  // длиной отбрасываем целиком
+  const safeId = (v) => (typeof v === 'string' && /^[\w.-]{1,64}$/.test(v) ? v : null);
 
   const spheres = arr(obj?.spheres)
-    .filter((s) => s && s.id && s.name)
+    .filter((s) => s && safeId(s.id) && s.name)
     .map((s) => {
-      const sphere = new Sphere(s);
+      const sphere = new Sphere({ ...s, id: safeId(s.id) });
       sphere.group = safeGroup(sphere.group);
       return sphere;
     });
@@ -232,9 +236,9 @@ export function normalizeImport(obj) {
   const refOrphan = (id) => (id && sphereIds.has(id) ? id : null);
 
   const tasks = arr(obj?.tasks)
-    .filter((t) => t && t.id && t.title)
+    .filter((t) => t && safeId(t.id) && t.title)
     .map((t) => {
-      const task = new Task(t);
+      const task = new Task({ ...t, id: safeId(t.id) });
       task.sphereId = refOrphan(task.sphereId);
       task.group = safeGroup(task.group);
       task.durationMin = safeInt(task.durationMin, 30, 5, 480);
@@ -243,9 +247,9 @@ export function normalizeImport(obj) {
     });
 
   const practices = arr(obj?.practices)
-    .filter((p) => p && p.id && p.title)
+    .filter((p) => p && safeId(p.id) && p.title)
     .map((p) => {
-      const practice = new Practice(p);
+      const practice = new Practice({ ...p, id: safeId(p.id) });
       practice.sphereId = refOrphan(practice.sphereId);
       practice.start = safeInt(practice.start, 0, 0, 1440);
       practice.end = safeInt(practice.end, practice.start || 0, 0, 1440);

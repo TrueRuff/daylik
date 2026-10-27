@@ -6,8 +6,13 @@ import { t } from './i18n.js';
 
 export function startReminderLoop(getDueReminders, onFire, intervalMs = 60_000) {
   const tick = async () => {
-    const due = await getDueReminders(Date.now());
-    for (const task of due) onFire(task);
+    try {
+      const due = await getDueReminders(Date.now());
+      for (const task of due) onFire(task);
+    } catch (err) {
+      // отказ базы не должен ронять цикл напоминаний
+      log.error('reminder.tickFailed', { message: err?.message });
+    }
   };
   const timer = setInterval(tick, intervalMs);
   return () => clearInterval(timer);

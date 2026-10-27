@@ -36,3 +36,24 @@ describe('toIcs', () => {
     expect(ics).toContain('PRODID:-//Daylik//Planner//RU');
   });
 });
+
+describe('toIcs — краевые случаи', () => {
+  it('дело через полночь даёт DTEND на следующий день', async () => {
+    const { toIcs } = await import('../src/core/ics.js');
+    const ics = toIcs([
+      { id: 't1', title: 'Ночной разбор', group: 'Н', scheduledDate: '2026-10-28', scheduledStart: 1380, durationMin: 120 },
+    ], { stamp: '20261028T000000' });
+    expect(ics).toContain('DTSTART:20261028T230000');
+    expect(ics).toContain('DTEND:20261029T010000');
+  });
+
+  it('перевод строки и возврат каретки в названии экранируются', async () => {
+    const { toIcs } = await import('../src/core/ics.js');
+    const title = 'строка' + String.fromCharCode(10) + 'вторая' + String.fromCharCode(13) + 'конец';
+    const ics = toIcs([
+      { id: 't1', title, group: 'Н', scheduledDate: '2026-10-28', scheduledStart: 600, durationMin: 30 },
+    ], { stamp: '20261028T000000' });
+    const summary = ics.split('\r\n').find((l) => l.startsWith('SUMMARY:'));
+    expect(summary).toBe('SUMMARY:строка\\nвторая\\rконец');
+  });
+});

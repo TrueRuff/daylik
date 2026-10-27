@@ -128,3 +128,26 @@ describe('normalizeImport — проверка импортируемых дан
     expect(restored).toEqual({ spheres: [], tasks: [], practices: [] });
   });
 });
+
+describe('normalizeImport — безопасность id', () => {
+  it('записи с опасным id отбрасываются, безопасные проходят', async () => {
+    const { normalizeImport } = await import('../src/core/serialization.js');
+    const data = normalizeImport({
+      spheres: [
+        { id: 'ok-1', name: 'Школа', group: 'П' },
+        { id: '"><img src=x onerror=alert(1)>', name: 'Зло', group: 'Н' },
+      ],
+      tasks: [
+        { id: '../etc', title: 'слэши тоже мимо', group: 'Н' },
+        { id: 'task-1', title: 'нормальное дело', group: 'Н' },
+      ],
+      practices: [
+        { id: 'x'.repeat(65), title: 'слишком длинный id', days: [1] },
+        { id: 'pr-1', title: 'нормальная рутина', days: [1] },
+      ],
+    });
+    expect(data.spheres.map((x) => x.id)).toEqual(['ok-1']);
+    expect(data.tasks.map((x) => x.id)).toEqual(['task-1']);
+    expect(data.practices.map((x) => x.id)).toEqual(['pr-1']);
+  });
+});
