@@ -12,6 +12,7 @@ import { startReminderLoop, fireNotification, requestPermission } from './core/r
 import { getDueReminders, updateTask, initLog, setDataOwner } from './core/storage.js';
 import { restoreSession, logout as authLogout, isAdmin } from './core/auth.js';
 import { seedDemoIfEmpty } from './core/demoData.js';
+import { openOnboarding } from './ui/onboarding.js';
 import { log } from './core/log.js';
 import { getLang, setLang, onChange, applyStatic, t } from './core/i18n.js';
 
@@ -29,10 +30,13 @@ const avatarEl = document.getElementById('who-avatar');
 const logoutBtn = document.getElementById('logout');
 const langBtn = document.getElementById('lang');
 const addBtn = document.getElementById('add');
+const helpBtn = document.getElementById('help');
 const logTabBtn = document.querySelector('nav button[data-tab="log"]');
 
 // «+ Добавить» — единственный путь к полному вводу (экрана «Ввод» больше нет)
 addBtn.addEventListener('click', openAddModal);
+// «?» — обзор приложения со скриншотами
+helpBtn.addEventListener('click', openOnboarding);
 
 initLog();
 
@@ -117,6 +121,7 @@ async function enterApp(acc) {
   logoutBtn.hidden = false;
   langBtn.hidden = false;
   addBtn.hidden = false;
+  helpBtn.hidden = false;
   themeBtn.hidden = false;
   logTabBtn.hidden = !isAdmin(acc);
   refreshBell();
@@ -140,6 +145,7 @@ function showLogin() {
   logoutBtn.hidden = true;
   langBtn.hidden = true;
   addBtn.hidden = true;
+  helpBtn.hidden = true;
   authScreen.show();
 }
 
