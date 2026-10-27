@@ -1,6 +1,6 @@
-// обзор приложения (кнопка «?»): кусочки интерфейса со стрелками-подписями.
-// скриншоты-вырезки сняты с реального интерфейса и лежат в public/onboarding;
-// показываются в натуральном размере, подпись — под вырезкой со стрелкой.
+// обзор приложения (кнопка «?»): скриншоты экранов с пронумерованными
+// метками и легендой. Метки заданы в процентах кадра — переживают смену
+// языка интерфейса, но не переезды элементов вёрстки.
 
 import { t, onChange } from '../core/i18n.js';
 
@@ -10,37 +10,37 @@ let root = null;
 function buildSections() {
   return [
     {
+      img: 'onboarding/day.png',
       title: t('onb.day.title'),
-      pieces: [
-        { img: 'onboarding/day-input.png', label: t('onb.day.input') },
-        { img: 'onboarding/day-card.png', label: t('onb.day.card') },
-        { img: 'onboarding/day-free.png', label: t('onb.day.free') },
-        { img: 'onboarding/day-side.png', label: t('onb.day.side') },
+      markers: [[9, 15], [57, 13], [48, 31], [48, 41], [80, 35], [91, 9], [28, 19], [87, 19]],
+      items: [
+        t('onb.day.1'), t('onb.day.2'), t('onb.day.3'), t('onb.day.4'),
+        t('onb.day.5'), t('onb.day.6'), t('onb.day.7'), t('onb.day.8'),
       ],
     },
     {
+      img: 'onboarding/add.png',
       title: t('onb.add.title'),
-      pieces: [
-        { img: 'onboarding/add-parse.png', label: t('onb.add.parse') },
-        { img: 'onboarding/add-types.png', label: t('onb.add.types') },
-        { img: 'onboarding/add-chips.png', label: t('onb.add.chips') },
-        { img: 'onboarding/add-remind.png', label: t('onb.add.remind') },
+      markers: [[65, 25], [39, 35], [50, 53], [43, 59], [37, 76], [50, 81]],
+      items: [
+        t('onb.add.1'), t('onb.add.2'), t('onb.add.3'), t('onb.add.4'),
+        t('onb.add.5'), t('onb.add.6'),
       ],
     },
     {
+      img: 'onboarding/areas.png',
       title: t('onb.areas.title'),
-      pieces: [
-        { img: 'onboarding/areas-cols.png', label: t('onb.areas.cols') },
-        { img: 'onboarding/areas-leaf.png', label: t('onb.areas.leaf') },
-        { img: 'onboarding/areas-block.png', label: t('onb.areas.block') },
+      markers: [[59, 15], [59, 24], [35, 25], [29, 34], [26, 56], [28, 66]],
+      items: [
+        t('onb.areas.1'), t('onb.areas.2'), t('onb.areas.3'), t('onb.areas.4'),
+        t('onb.areas.5'), t('onb.areas.6'),
       ],
     },
     {
+      img: 'onboarding/calendar.png',
       title: t('onb.cal.title'),
-      pieces: [
-        { img: 'onboarding/cal-dots.png', label: t('onb.cal.dots') },
-        { img: 'onboarding/cal-modal.png', label: t('onb.cal.modal') },
-      ],
+      markers: [[66, 8], [23, 21], [48, 75]],
+      items: [t('onb.cal.1'), t('onb.cal.2'), t('onb.cal.3')],
     },
   ];
 }
@@ -49,12 +49,14 @@ function render() {
   const sections = buildSections()
     .map((s) => `
       <h3>${s.title}</h3>
-      ${s.pieces.map((p) => `
-        <figure class="onb-piece">
-          <div class="onb-shot"><img src="${p.img}" alt="" loading="lazy"></div>
-          <svg class="onb-arrow" viewBox="0 0 16 14" aria-hidden="true"><path d="M8 13V4M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <figcaption>${p.label}</figcaption>
-        </figure>`).join('')}`)
+      <div class="onb-shot">
+        <img src="${s.img}" alt="" loading="lazy">
+        ${s.markers.map(([x, y], i) =>
+          `<span class="onb-dot" style="left:${x}%;top:${y}%">${i + 1}</span>`).join('')}
+      </div>
+      <ol class="onb-items">
+        ${s.items.map((item, i) => `<li><span class="onb-num">${i + 1}</span>${item}</li>`).join('')}
+      </ol>`)
     .join('');
   root.innerHTML = `
     <div class="modal-overlay">
