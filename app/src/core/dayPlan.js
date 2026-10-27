@@ -104,23 +104,6 @@ export function findFreeWindow(blocks, durationMin) {
 
 // можно ли поставить дело на start: без пересечений с занятостью и в пределах дня.
 // ignoreTaskId — блок самого перетаскиваемого дела (себя не считаем)
-export function canPlaceAt(occupancy, start, durationMin, ignoreTaskId = null) {
-  const end = start + durationMin;
-  if (start < 0 || end > MINUTES_IN_DAY) return false;
-  return occupancy.every((b) => {
-    if (ignoreTaskId != null && b.taskId === ignoreTaskId) return true;
-    return end <= b.start || start >= b.end;
-  });
-}
-
-/**
- * собирает план дня.
- * @param {string} date 'YYYY-MM-DD'
- * @param {Array<{start:number,end:number,label:string}>} routines рутины из практик
- * @param {Array<Task>} tasks дела со статусом 'todo'
- * @param {Object} [opts] { sort } — стратегия сортировки кандидатов (adaptiveSort)
- * @returns {{ date: string, blocks: PlanBlock[] }}
- */
 export function buildDay(date, routines, tasks, { sort = sortCandidates } = {}) {
   const blocks = [];
 

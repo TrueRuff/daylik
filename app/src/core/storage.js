@@ -42,6 +42,10 @@ export function setDataOwner(login) {
   dataOwner = login;
 }
 
+export function getDataOwner() {
+  return dataOwner;
+}
+
 // записи видимого владельца; без владельца (null) видно всё
 function isOwned(row) {
   return dataOwner == null || row.owner === dataOwner;

@@ -12,9 +12,10 @@ import {
 } from '../core/storage.js';
 import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
 import { toIcs } from '../core/ics.js';
-import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
+import { minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml, downloadFile, daysCheckboxes, groupOptions, timeRangeFields, normalizeTimeValue } from './dom.js';
+import { getDataOwner } from '../core/storage.js';
 
 const EXAMPLES = [
   { name: 'Сон', group: 'Н' },
@@ -44,6 +45,7 @@ function blockFormHtml() {
 
 export function initSpheresScreen(root) {
   let drag = null; // перетаскивание карточки между колонками
+  let ioPending = null; // сообщение, которое должно пережить перерисовку
 
   async function renderList() {
     const spheres = await getAllSpheres();
@@ -101,7 +103,8 @@ export function initSpheresScreen(root) {
         <input id="import-file" type="file" accept=".json,.daylik" hidden>
       </div>
       ${demo ? `<div class="row"><button id="demo-reset" class="secondary">${t('data.demoReset')}</button></div>` : ''}
-      <p id="io-msg" class="muted"></p>`;
+      <p id="io-msg" class="muted">${ioPending ? escapeHtml(ioPending) : ''}</p>`;
+    if (ioPending) ioPending = null; // сообщение показано однократно
   }
 
   function formHtml(sphere, practices, isNew, tasks = []) {
@@ -166,6 +169,7 @@ export function initSpheresScreen(root) {
   }
 
   function ioMessage(text) {
+    ioPending = text;
     const el = root.querySelector('#io-msg');
     if (el) el.textContent = text;
   }
@@ -421,9 +425,14 @@ export function initSpheresScreen(root) {
     if (e.target.id === 'demo-reset') {
       if (!confirm(t('data.demoConfirm'))) return;
       await deleteDemoData();
-      await renderList(); // сначала перерисовка, потом сообщение — иначе его сотрёт
-      ioMessage(t('data.demoRemoved'));
+      try {
+        localStorage.setItem('daylik-demo-off:' + getDataOwner(), '1');
+      } catch {
+        // без localStorage демо просто вернётся при следующем входе
+      }
+      await renderList();
       document.dispatchEvent(new CustomEvent('data-changed'));
+      ioMessage(t('data.demoRemoved'));
       return;
     }
 

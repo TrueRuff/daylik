@@ -15,7 +15,7 @@ export function downloadFile(name, blob) {
 }
 
 // чекбоксы дней недели (1..7) — квадратики вплотную, состояние внутри плитки
-import { dayNames, minutesToTime, todayStr, addDays, localInputToTs } from '../core/schedule.js';
+import { dayNames, todayStr, addDays, localInputToTs } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
 
 export function daysCheckboxes(selected = [1, 2, 3, 4, 5, 6, 7]) {

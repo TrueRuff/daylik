@@ -4,7 +4,7 @@
 // кнопкой «Убрать тестовые данные».
 
 import { Sphere, Practice, Task } from './models.js';
-import { getAllSpheres, getPractices, getTasks, saveSphere, savePractice, saveTask } from './storage.js';
+import { getAllSpheres, getPractices, getTasks, saveSphere, savePractice, saveTask, getDataOwner } from './storage.js';
 import { log } from './log.js';
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -50,9 +50,19 @@ function makeTasks(sphereId) {
   return baseTasks().map((t) => new Task({ ...t, sphereId: sphereFor[t.title] ?? null }));
 }
 
+// демо отключено для аккаунта, если пользователь уже убирал его кнопкой
+function demoDismissed() {
+  try {
+    return localStorage.getItem('daylik-demo-off:' + getDataOwner()) === '1';
+  } catch {
+    return false;
+  }
+}
+
 // при входе: пустому аккаунту — полный демо-день, остальным — базовые дела
 // (один раз, пока не удалят кнопкой); свои данные не трогаем
 export async function seedOnLogin() {
+  if (demoDismissed()) return false;
   const [allSpheres, allPractices, allTasks] = await Promise.all([getAllSpheres(), getPractices(), getTasks()]);
   const hasDemoTask = allTasks.some((x) => x.demo);
 

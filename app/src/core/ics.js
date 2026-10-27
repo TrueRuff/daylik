@@ -2,7 +2,7 @@
 // становятся событиями с началом и длительностью. RFC 5545: строки через CRLF,
 // спецсимволы экранируются, даты в базовом формате YYYYMMDDTHHMMSS.
 
-import { minutesToTime, addDays } from './schedule.js';
+import { addDays } from './schedule.js';
 
 // дата+минуты -> 'YYYYMMDDTHHMMSS'; минуты за полночь переносятся на следующий день
 function icsDate(dateStr, minutes) {
