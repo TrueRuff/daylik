@@ -1,6 +1,6 @@
-// Генератор PNG-иконок без внешних библиотек: сырые пиксели -> zlib -> чанки PNG.
-// Рисунок: тёмный фон приложения, белый круг (дело на таймлайне), красная линия «сейчас».
-// Запуск: node scripts/make-icons.mjs
+// генератор PNG-иконок без внешних библиотек: сырые пиксели -> zlib -> чанки PNG.
+// рисунок: тёмный фон приложения, белый круг (дело на таймлайне), красная линия «сейчас».
+// запуск: node scripts/make-icons.mjs
 
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -54,7 +54,7 @@ const BG = [0x33, 0x3a, 0x45];
 const WHITE = [0xff, 0xff, 0xff];
 const RED = [0xd0, 0x65, 0x65];
 
-// Сглаживание: считаем 4x4 подпикселей
+// сглаживание: считаем 4x4 подпикселей
 function render(size) {
   const px = Buffer.alloc(size * size * 4);
   const SS = 4;

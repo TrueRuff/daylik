@@ -1,4 +1,4 @@
-// Точка входа: вход в аккаунт, вкладки, экраны, цикл напоминаний, язык интерфейса
+// точка входа: вход в аккаунт, вкладки, экраны, цикл напоминаний, язык интерфейса
 
 import './styles.css';
 import '@fontsource-variable/inter';
@@ -70,7 +70,7 @@ document.addEventListener('data-changed', () => {
   if (account) showTab(currentTab);
 });
 
-// Свайпы на телефоне: горизонтальный жест листает вкладки. Жесты, нужные
+// свайпы на телефоне: горизонтальный жест листает вкладки. Жесты, нужные
 // самим экранам (календарь, перетаскивание дел, поля ввода), исключены.
 const SWIPE_MIN = 70;
 let swipe = null;
@@ -96,7 +96,7 @@ document.addEventListener('touchend', (e) => {
   if (next) showTab(next);
 }, { passive: true });
 
-// ---------- вход и выход ----------
+// вход и выход
 
 function enterApp(acc) {
   account = acc;
@@ -137,7 +137,7 @@ logoutBtn.addEventListener('click', () => {
 
 const authScreen = initAuthScreen(authRoot, enterApp);
 
-// Сессия из прошлого запуска: валидный токен — сразу в приложение,
+// сессия из прошлого запуска: валидный токен — сразу в приложение,
 // иначе экран входа (там же при первом запуске создаётся встроенный админ)
 restoreSession().then((acc) => {
   if (acc) enterApp(acc);
@@ -145,7 +145,7 @@ restoreSession().then((acc) => {
   log.info('app.start', { lang: getLang(), account: acc?.login ?? null });
 });
 
-// Язык: кнопка показывает язык, на который переключит; смена перерисовывает экраны
+// язык: кнопка показывает язык, на который переключит; смена перерисовывает экраны
 
 function refreshLangBtn() {
   langBtn.textContent = getLang() === 'ru' ? 'EN' : 'RU';
@@ -165,7 +165,7 @@ onChange(() => {
 applyStatic();
 refreshLangBtn();
 
-// Тема: светлая/тёмная, старт — по сохранённому выбору или системной
+// тема: светлая/тёмная, старт — по сохранённому выбору или системной
 // (первичная установка делает inline-скрипт в index.html до отрисовки)
 const themeBtn = document.getElementById('theme');
 const THEME_KEY = 'daylik-theme';
@@ -197,7 +197,7 @@ themeBtn.addEventListener('click', () => {
 });
 refreshThemeBtn();
 
-// Уведомления: разрешение спрашиваем кнопкой, затем работает цикл напоминаний
+// уведомления: разрешение спрашиваем кнопкой, затем работает цикл напоминаний
 const bell = document.getElementById('bell');
 function refreshBell() {
   bell.hidden = typeof Notification !== 'undefined' && Notification.permission === 'granted';
@@ -215,7 +215,7 @@ startReminderLoop(
   }
 );
 
-// PWA: service worker только в продакшн-сборке (на dev-сервере кэш мешал бы
+// service worker — только в продакшн-сборке (на dev-сервере кэш мешал бы
 // свежему коду), в браузере по http/https; Electron работает с file://
 if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('./sw.js').catch((err) => {

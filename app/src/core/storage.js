@@ -1,5 +1,5 @@
-// Слой хранения: IndexedDB через Dexie.
-// Единственная точка доступа к данным — всё остальное работает через этот модуль.
+// слой хранения: IndexedDB через Dexie.
+// единственная точка доступа к данным — всё остальное работает через этот модуль.
 
 import Dexie from 'dexie';
 import { Sphere, Task, Practice } from './models.js';
@@ -23,7 +23,7 @@ db.version(3).stores({
 });
 
 // v4: аккаунты + владелец у данных (разделение по учётным записям).
-// Существующие записи достаются встроенному админу — данные автора не теряются.
+// существующие записи достаются встроенному админу — данные автора не теряются.
 db.version(4).stores({
   accounts: 'login',
   spheres: 'id, name, group, owner',
@@ -35,14 +35,14 @@ db.version(4).stores({
   }
 });
 
-// Логин вошедшего аккаунта; null — фильтр выключен (до входа и в тестах)
+// логин вошедшего аккаунта; null — фильтр выключен (до входа и в тестах)
 let dataOwner = null;
 
 export function setDataOwner(login) {
   dataOwner = login;
 }
 
-// Записи видимого владельца; без владельца (null) видно всё
+// записи видимого владельца; без владельца (null) видно всё
 function isOwned(row) {
   return dataOwner == null || row.owner === dataOwner;
 }
@@ -52,7 +52,7 @@ function stampOwner(row) {
   return row;
 }
 
-// ---------- аккаунты ----------
+// аккаунты
 
 export async function getAccount(login) {
   return db.accounts.get(login);
@@ -93,7 +93,7 @@ export async function deleteTask(id) {
   await db.tasks.delete(id);
 }
 
-// Завершение дела: обычное — просто done; повторяющееся — done + создаётся
+// завершение дела: обычное — просто done; повторяющееся — done + создаётся
 // следующее вхождение (та же длительность/группа/повтор, место в расписании —
 // на следующую дату). Возвращает созданное вхождение или null.
 export async function completeTask(task) {
@@ -114,8 +114,8 @@ export async function completeTask(task) {
   return next;
 }
 
-// Задачи с наступившим временем напоминания.
-// Фильтр по месту: в IndexedDB null меньше числа и попал бы в выборку belowThanOrEqual.
+// задачи с наступившим временем напоминания.
+// фильтр по месту: в IndexedDB null меньше числа и попал бы в выборку belowThanOrEqual.
 export async function getDueReminders(now) {
   const rows = await db.tasks.filter((t) => isOwned(t) && t.dueAt && t.dueAt <= now && t.status !== 'done').toArray();
   return rows.map((r) => new Task(r));
@@ -135,13 +135,13 @@ export async function deletePractice(id) {
   await db.practices.delete(id);
 }
 
-// Сфера удаляется вместе со своими практиками
+// сфера удаляется вместе со своими практиками
 export async function deleteSphere(id) {
   await db.spheres.delete(id);
   await db.practices.where('sphereId').equals(id).delete();
 }
 
-// Экспорт/импорт данных (см. serialization.js); без владельца — все записи,
+// экспорт/импорт данных (см. serialization.js); без владельца — все записи,
 // после входа — только данные текущего аккаунта
 export async function exportAll() {
   const data = {
@@ -153,7 +153,7 @@ export async function exportAll() {
   return data;
 }
 
-// Импорт с заменой данных текущего владельца (или всех, пока входа не было);
+// импорт с заменой данных текущего владельца (или всех, пока входа не было);
 // возвращает очищенные записи
 export async function importAll(data) {
   const clean = normalizeImport(data);
@@ -176,7 +176,7 @@ export async function importAll(data) {
   return clean;
 }
 
-// Тестовая утилита: полная очистка таблиц (используется только из storage.test.js)
+// тестовая утилита: полная очистка таблиц (используется только из storage.test.js)
 export async function __clearForTests() {
   await db.spheres.clear();
   await db.tasks.clear();
@@ -185,7 +185,7 @@ export async function __clearForTests() {
   await db.accounts.clear();
 }
 
-// Журнал: записи пишутся в таблицу logs, хвост длиннее LOG_CAP подрезается
+// журнал: записи пишутся в таблицу logs, хвост длиннее LOG_CAP подрезается
 const LOG_CAP = 1000;
 
 export function initLog() {
@@ -199,7 +199,7 @@ export function initLog() {
   });
 }
 
-// Последние записи журнала из базы (переживают перезапуск), сначала новые
+// последние записи журнала из базы (переживают перезапуск), сначала новые
 export async function getLogs({ limit = 200, minLevel = null } = {}) {
   let rows = await db.logs.orderBy('time').reverse().limit(1000).toArray();
   if (minLevel) {

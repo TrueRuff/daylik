@@ -1,8 +1,8 @@
-// Вспомогательные функции для расписания: время и дни недели
+// вспомогательные функции для расписания: время и дни недели
 
 import { t } from './i18n.js';
 
-// Названия дней — из словаря локализации (см. i18n.js), ключи 0..6
+// названия дней — из словаря локализации (см. i18n.js), ключи 0..6
 export function dayNames() {
   return t('dayNames');
 }
@@ -18,7 +18,7 @@ export function minutesToTime(min) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-// Проходит ли практика в указанный день недели (1..7, 1 = понедельник)
+// проходит ли практика в указанный день недели (1..7, 1 = понедельник)
 export function practiceAppliesOn(practice, dayOfWeek) {
   return practice.days.includes(dayOfWeek);
 }
@@ -33,7 +33,7 @@ export function formatDays(days) {
     .join(', ');
 }
 
-// Timestamp -> значение поля datetime-local ('YYYY-MM-DDTHH:mm', локальное время)
+// timestamp -> значение поля datetime-local ('YYYY-MM-DDTHH:mm', локальное время)
 export function tsToLocalInput(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -41,12 +41,12 @@ export function tsToLocalInput(ts) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Значение datetime-local -> timestamp; пустая строка -> null
+// значение datetime-local -> timestamp; пустая строка -> null
 export function localInputToTs(val) {
   return val ? new Date(val).getTime() : null;
 }
 
-// Сегодняшняя дата 'YYYY-MM-DD' в локальном времени
+// сегодняшняя дата 'YYYY-MM-DD' в локальном времени
 export function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -59,7 +59,7 @@ export function addDays(dateStr, n) {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-// День недели даты 'YYYY-MM-DD': 1 = понедельник .. 7 = воскресенье
+// день недели даты 'YYYY-MM-DD': 1 = понедельник .. 7 = воскресенье
 export function weekdayOf(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return ((new Date(y, m - 1, d).getDay() + 6) % 7) + 1;

@@ -1,4 +1,4 @@
-// Аутентификация: аккаунты в IndexedDB (таблица accounts в storage.js),
+// аутентификация: аккаунты в IndexedDB (таблица accounts в storage.js),
 // сессия — JWT (HS256, Web Crypto) в localStorage. Токен живёт 30 дней и
 // переживает перезапуск приложения; «Выйти» стирает его. Приложение локальное,
 // без сервера — секрет подписи хранится в коде, проверка токена отсекает
@@ -11,10 +11,10 @@ const TOKEN_KEY = 'daylik-token';
 const TOKEN_TTL_MS = 30 * 24 * 3600 * 1000;
 const SECRET = new TextEncoder().encode('daylik-local-hs256-secret');
 
-// Встроенный аккаунт разработчика: админ видит журнал событий
+// встроенный аккаунт разработчика: админ видит журнал событий
 const BUILTIN = { login: 'админ', password: '123', role: 'admin' };
 
-// ---------- base64url ----------
+// base64url
 
 function b64urlFromBytes(bytes) {
   let bin = '';
@@ -40,14 +40,14 @@ function jsonFromB64url(str) {
   return JSON.parse(new TextDecoder().decode(bytesFromB64url(str)));
 }
 
-// ---------- пароли и подпись ----------
+// пароли и подпись
 
 async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', enc.encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Соль на аккаунт — одинаковые пароли дают разные хэши
+// соль на аккаунт — одинаковые пароли дают разные хэши
 async function hashPassword(password, salt) {
   return sha256Hex(`${salt}:${password}`);
 }
@@ -56,9 +56,9 @@ async function hmacKey() {
   return crypto.subtle.importKey('raw', SECRET, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-// ---------- JWT ----------
+// JWT
 
-// Подписывает payload (login, role), добавляя iat и exp; ttlMs — для тестов
+// подписывает payload (login, role), добавляя iat и exp; ttlMs — для тестов
 export async function signToken(payload, ttlMs = TOKEN_TTL_MS) {
   const issued = Date.now();
   const body = { ...payload, iat: issued, exp: issued + ttlMs };
@@ -67,7 +67,7 @@ export async function signToken(payload, ttlMs = TOKEN_TTL_MS) {
   return `${data}.${b64urlFromBytes(new Uint8Array(sig))}`;
 }
 
-// Проверяет подпись и срок; битый/просроченный/чужой токен → null
+// проверяет подпись и срок; битый/просроченный/чужой токен → null
 export async function verifyToken(token) {
   if (typeof token !== 'string') return null;
   const [h, p, s] = token.split('.');
@@ -82,7 +82,7 @@ export async function verifyToken(token) {
   }
 }
 
-// ---------- сессия в localStorage ----------
+// сессия в localStorage
 
 function saveToken(token) {
   try {
@@ -108,26 +108,26 @@ export function dropToken() {
   }
 }
 
-// Выход: сессия стирается, данные остаются в базе под логином
+// выход: сессия стирается, данные остаются в базе под логином
 export function logout() {
   dropToken();
 }
 
-// ---------- аккаунты ----------
+// аккаунты
 
 async function makeAccount(login, password, role) {
   const salt = crypto.randomUUID();
   return { login, salt, passHash: await hashPassword(password, salt), role, createdAt: Date.now() };
 }
 
-// Встроенный админ (админ/123) создаётся при первом показе экрана входа
+// встроенный админ (админ/123) создаётся при первом показе экрана входа
 export async function ensureBuiltinAdmin() {
   if (await getAccount(BUILTIN.login)) return;
   await putAccount(await makeAccount(BUILTIN.login, BUILTIN.password, BUILTIN.role));
   log.info('auth.builtinAdmin', { login: BUILTIN.login });
 }
 
-// Возвращает { account, token } или { error: ключ словаря }
+// возвращает { account, token } или { error: ключ словаря }
 export async function register(login, password) {
   const name = String(login || '').trim();
   const pass = String(password || '');
@@ -155,7 +155,7 @@ export async function login(login, password) {
   return { account, token };
 }
 
-// Восстановление сессии при запуске: токен из localStorage проверяется
+// восстановление сессии при запуске: токен из localStorage проверяется
 // подписью и сроком, аккаунт должен существовать
 export async function restoreSession() {
   const token = readToken();

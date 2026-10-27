@@ -1,11 +1,11 @@
-// Гибридный разбор ввода: сначала локальные правила (словарь + регулярки),
+// гибридный разбор ввода: сначала локальные правила (словарь + регулярки),
 // при низкой уверенности — внешний LLM API (см. src/ai/llmClient.js).
-// Контракт: categorize(rawText) → { kind, title, group, durationMin?, repeatRule?, confidence, provider }
+// контракт: categorize(rawText) → { kind, title, group, durationMin?, repeatRule?, confidence, provider }
 
 import { categorizeWithLlm } from '../ai/llmClient.js';
 import { log } from './log.js';
 
-// Длительность в тексте: «на 20 минут», «за 2 часа», «полчаса», «полтора часа».
+// длительность в тексте: «на 20 минут», «за 2 часа», «полчаса», «полтора часа».
 // \b в JS не знает кириллицы, поэтому конец слова — lookahead (?![а-яё]).
 const DURATION_RE = /(?:на\s+|за\s+)?(?:(\d+)\s*(минут[а-яё]*|мин|час[а-яё]*|ч)(?![а-яё])|полчаса|полтора\s+часа)/i;
 
@@ -18,7 +18,7 @@ export function extractDuration(text) {
   return /^ч/i.test(m[2]) ? n * 60 : n;
 }
 
-// Явная длительность перекрывает дефолт правила и вычищается из названия
+// явная длительность перекрывает дефолт правила и вычищается из названия
 function withDuration(result) {
   const dur = extractDuration(result.title);
   if (dur == null) return result;
@@ -29,8 +29,8 @@ function withDuration(result) {
   };
 }
 
-// Словарь правил: ключевое слово/регулярка → разбор.
-// Порядок важен: первый совпавший шаблон побеждает.
+// словарь правил: ключевое слово/регулярка → разбор.
+// порядок важен: первый совпавший шаблон побеждает.
 const RULES = [
   {
     // «читать 20 страниц в день», «бегать каждое утро», «медитировать по вечерам» → практика
@@ -86,7 +86,7 @@ export function categorizeByRules(rawText) {
     return result.kind === 'task' ? withDuration(result) : result;
   }
 
-  // Ничего не распознали — но длительность из текста вытащить всё же попробуем
+  // ничего не распознали — но длительность из текста вытащить всё же попробуем
   const fallback = { kind: 'task', title: raw, group: null, confidence: 0.1, provider: 'rules' };
   return withDuration(fallback);
 }
@@ -97,7 +97,7 @@ export async function categorize(rawText) {
   const rulesResult = categorizeByRules(rawText);
   if (rulesResult.confidence >= CONFIDENCE_THRESHOLD) return rulesResult;
 
-  // Низкая уверенность — пробуем внешний LLM; недоступен → работаем на правилах
+  // низкая уверенность — пробуем внешний LLM; недоступен → работаем на правилах
   try {
     const llmResult = await categorizeWithLlm(rawText);
     if (llmResult) return llmResult;

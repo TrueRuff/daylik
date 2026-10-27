@@ -1,4 +1,4 @@
-// Модели данных (см. проектирование.md, раздел 2)
+// модели данных (см. проектирование.md, раздел 2)
 
 export const GROUPS = ['Н', 'Ж', 'П']; // Необходимо / Желательно / Полезно
 // названия групп — в словаре локализации (i18n.js), ключи group.Н / group.Ж / group.П
@@ -51,7 +51,7 @@ export class Task {
   }
 }
 
-// Регулярная практика направления (сон, тренировки, пары); в интерфейсе Sphere — «Направление»
+// регулярная практика направления (сон, тренировки, пары); в интерфейсе Sphere — «Направление»
 export class Practice {
   constructor({ id, sphereId = null, title, days = [1, 2, 3, 4, 5, 6, 7], start = 540, end = 600, owner = null }) {
     this.id = id;
@@ -64,7 +64,7 @@ export class Practice {
   }
 }
 
-// Блок таймлайна дня
+// блок таймлайна дня
 export class PlanBlock {
   constructor({ id, start, end, kind = 'free', label = null, taskId = null }) {
     this.id = id;

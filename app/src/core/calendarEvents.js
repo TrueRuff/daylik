@@ -1,6 +1,6 @@
-// События для FullCalendar: рутины и запланированные дела, разворачиваемые
+// события для FullCalendar: рутины и запланированные дела, разворачиваемые
 // по датам диапазона (день на экране «День», месяц на экране «Календарь»).
-// Чистые функции без DOM — покрываются юнит-тестами.
+// чистые функции без DOM — покрываются юнит-тестами.
 
 import { practiceAppliesOn, addDays, weekdayOf } from './schedule.js';
 import { practicesToBlocks } from './dayPlan.js';
@@ -9,7 +9,7 @@ import { practicesToBlocks } from './dayPlan.js';
 export const GROUP_COLORS = { 'Н': '#a94e35', 'Ж': '#8a6410', 'П': '#40628a' };
 export const ROUTINE_COLOR = '#6f7581';
 
-// Date -> 'YYYY-MM-DD' в локальной зоне (без UTC-сдвига)
+// date -> 'YYYY-MM-DD' в локальной зоне (без UTC-сдвига)
 export function toDateStr(date) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -20,9 +20,9 @@ function localDate(dateStr, minutes) {
   return new Date(y, m - 1, d, Math.floor(minutes / 60), minutes % 60);
 }
 
-// Диапазон дат [from, to] включительно; рутины фильтруются по дню недели,
+// диапазон дат [from, to] включительно; рутины фильтруются по дню недели,
 // полночные разбиваются practicesToBlocks; дела берутся с датой и временем.
-// Дела с датой без времени — события «весь день» (видны в месяце).
+// дела с датой без времени — события «весь день» (видны в месяце).
 export function eventsForRange(fromDate, toDate, practices, tasks) {
   const events = [];
   for (let date = fromDate; date <= toDate; date = addDays(date, 1)) {
@@ -60,7 +60,7 @@ export function taskEvent(task, date = task.scheduledDate) {
   };
 }
 
-// События «весь день» (дата без времени) в границах диапазона — для месяца
+// события «весь день» (дата без времени) в границах диапазона — для месяца
 export function allDayEvents(fromDate, toDate, tasks) {
   return tasks
     .filter((x) => x.scheduledDate && x.scheduledStart == null

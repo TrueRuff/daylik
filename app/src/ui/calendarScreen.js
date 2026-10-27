@@ -1,4 +1,4 @@
-// Экран «Календарь»: месяц FullCalendar — все запланированные дела и рутины
+// экран «Календарь»: месяц FullCalendar — все запланированные дела и рутины
 // за месяц, пролистывание назад/вперёд. Просмотр: расстановка — на «Дне».
 
 import { Calendar } from '@fullcalendar/core';
@@ -13,7 +13,7 @@ export function initCalendarScreen(root) {
   let dirty = true; // данные меняются на других экранах — обновимся при показе
   let calendar = null;
 
-  // Локаль меняется только пересозданием календаря (смена языка EN/RU)
+  // локаль меняется только пересозданием календаря (смена языка EN/RU)
   function build() {
     calendar?.destroy();
     calendar = new Calendar(root, {

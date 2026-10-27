@@ -1,4 +1,4 @@
-// Экран «Направления»: три группы Н/Ж/П, карточка направления с описаниями
+// экран «Направления»: три группы Н/Ж/П, карточка направления с описаниями
 // и практиками. Карточку можно перетащить в другую колонку — смена группы.
 
 import { Sphere, Practice, Task } from '../core/models.js';
@@ -24,7 +24,7 @@ const EXAMPLES = [
 
 const DRAG_THRESHOLD = 6;
 
-// Форма блока дня (рутины без направления: сон, еда). Редактирование —
+// форма блока дня (рутины без направления: сон, еда). Редактирование —
 // кликом по блоку на «Дне», создание живёт здесь.
 function blockFormHtml() {
   return `
@@ -183,7 +183,7 @@ export function initSpheresScreen(root) {
     ioMessage(t('data.saved'));
   }
 
-  // Файл читаем всегда как байты и различаем по сигнатуре DAYL
+  // файл читаем всегда как байты и различаем по сигнатуре DAYL
   async function importFile(file) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const isBinary = bytes.length >= 4 && [68, 65, 89, 76].every((b, i) => bytes[i] === b);
@@ -209,7 +209,7 @@ export function initSpheresScreen(root) {
     ioMessage(t('data.imported'));
   }
 
-  // ---------- перетаскивание карточки направления между колонками ----------
+  // перетаскивание карточки направления между колонками
 
   root.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;

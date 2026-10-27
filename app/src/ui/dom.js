@@ -1,11 +1,11 @@
-// Экранирование пользовательского текста перед вставкой в разметку
+// экранирование пользовательского текста перед вставкой в разметку
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
 
-// Скачивание файла через временный <a download>
+// скачивание файла через временный <a download>
 export function downloadFile(name, blob) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -14,7 +14,7 @@ export function downloadFile(name, blob) {
   URL.revokeObjectURL(a.href);
 }
 
-// Чекбоксы дней недели (1..7); общий фрагмент для ввода, направлений и блоков дня
+// чекбоксы дней недели (1..7); общий фрагмент для ввода, направлений и блоков дня
 import { dayNames, minutesToTime } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
 
@@ -24,13 +24,13 @@ export function daysCheckboxes(selected = [1, 2, 3, 4, 5, 6, 7]) {
   ).join('');
 }
 
-// Опции селекта групп Н/Ж/П с выделенной текущей
+// опции селекта групп Н/Ж/П с выделенной текущей
 export function groupOptions(current) {
   return ['Н', 'Ж', 'П'].map((g) =>
     `<option value="${g}"${g === current ? ' selected' : ''}>${g} — ${t(`group.${g}`)}</option>`).join('');
 }
 
-// Выбор времени списком (шаг 15 мин) вместо нативного поля: выбор вместо
+// выбор времени списком (шаг 15 мин) вместо нативного поля: выбор вместо
 // набора, формат всегда 24-часовой независимо от языка браузера
 export function timeSelect(cls, value = '', optional = false) {
   let hasCurrent = !value;
@@ -46,7 +46,7 @@ export function timeSelect(cls, value = '', optional = false) {
   return `<select class="${cls}">${empty}${rows.join('')}</select>`;
 }
 
-// Пара полей «Начало / Конец»
+// пара полей «Начало / Конец»
 export function timeRangeFields(start = '09:00', end = '10:00') {
   return `
     <div class="row">

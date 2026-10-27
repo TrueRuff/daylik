@@ -1,13 +1,13 @@
-// Клиент LLM API (OpenRouter, бесплатный тариф).
-// Ключ и модель берутся из .env (VITE_OPENROUTER_API_KEY, VITE_LLM_MODEL, см. .env.example).
-// Любая ошибка — нет ключа, сеть, HTTP, неожиданный ответ — даёт null: разбор падает на правила.
+// клиент LLM API (OpenRouter, бесплатный тариф).
+// ключ и модель берутся из .env (VITE_OPENROUTER_API_KEY, VITE_LLM_MODEL, см. .env.example).
+// любая ошибка — нет ключа, сеть, HTTP, неожиданный ответ — даёт null: разбор падает на правила.
 
 import { log } from '../core/log.js';
 
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const REQUEST_TIMEOUT_MS = 20000;
 const RETRY_DELAY_MS = 2000;
-// У бесплатных моделей общий пул: 429/5xx часто уходит за секунды — пробуем ещё раз
+// у бесплатных моделей общий пул: 429/5xx часто уходит за секунды — пробуем ещё раз
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 // openrouter/free — роутер: сам выбирает свободную модель из бесплатных
 const DEFAULT_MODEL = 'openrouter/free';
@@ -87,7 +87,7 @@ export async function categorizeWithLlm(rawText) {
   return result;
 }
 
-// Модели обрамляют JSON пояснениями или ```-блоками, иногда выдают несколько
+// модели обрамляют JSON пояснениями или ```-блоками, иногда выдают несколько
 // объектов подряд — берём первый сбалансированный {...}
 function extractFirstJson(text) {
   const start = text.indexOf('{');
@@ -132,7 +132,7 @@ function parseLlmAnswer(text) {
 const BREAKDOWN_PROMPT = `Разбей дело на 3–6 маленьких конкретных шагов, каждый по 10–30 минут.
 Верни строго JSON-массив строк без пояснений: ["шаг 1", "шаг 2", ...]`;
 
-// Разбиение большого дела на шаги (идея из goblin.tools). null — ключа нет,
+// разбиение большого дела на шаги (идея из goblin.tools). null — ключа нет,
 // сеть недоступна или модель ответила не массивом
 export async function breakdownWithLlm(title) {
   const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;

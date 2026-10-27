@@ -1,11 +1,11 @@
-// Повторяющиеся дела: расчёт следующего вхождения по repeatRule.
+// повторяющиеся дела: расчёт следующего вхождения по repeatRule.
 // repeatRule: null | 'daily' | 'weekly' | 'every:N' (каждые N дней).
 
 import { addDays } from './schedule.js';
 
 const EVERY_RE = /^every:(\d+)$/;
 
-// Следующая дата 'YYYY-MM-DD' для повтора от базовой даты
+// следующая дата 'YYYY-MM-DD' для повтора от базовой даты
 export function nextDate(repeatRule, fromDate) {
   const daily = EVERY_RE.exec(repeatRule);
   if (repeatRule === 'daily') return addDays(fromDate, 1);
@@ -19,8 +19,8 @@ export function isRepeatRule(v) {
 }
 
 /**
- * Следующее вхождение дела после завершения.
- * Возвращает патч для новой задачи-вхождения или null, если дело не повторяется.
+ * следующее вхождение дела после завершения.
+ * возвращает патч для новой задачи-вхождения или null, если дело не повторяется.
  */
 export function nextOccurrence(task) {
   if (!task.repeatRule || !isRepeatRule(task.repeatRule)) return null;

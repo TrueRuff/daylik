@@ -1,4 +1,4 @@
-// Локализация: словари ru/en, выбор языка сохраняется в localStorage.
+// локализация: словари ru/en, выбор языка сохраняется в localStorage.
 // t(key, params) — перевод с подстановкой {параметров}; отсутствующий ключ
 // отдаётся сам ключом (невозможно потерять кнопку из-за опечатки в словаре).
 
@@ -369,7 +369,7 @@ export function t(key, params) {
   return val;
 }
 
-// Статические узлы index.html: data-i18n (текст), data-i18n-title, data-i18n-placeholder
+// статические узлы index.html: data-i18n (текст), data-i18n-title, data-i18n-placeholder
 export function applyStatic(root = document) {
   root.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);

@@ -1,4 +1,4 @@
-// Главный процесс Electron: окно приложения с собранной веб-версией (dist/)
+// главный процесс Electron: окно приложения с собранной веб-версией (dist/)
 const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 

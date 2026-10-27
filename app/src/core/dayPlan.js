@@ -1,12 +1,12 @@
-// Календарь дня: рутины занимают таймлайн, в свободные окна подбираются дела.
-// Ключевая алгоритмическая часть темы: фильтрация + сортировка + упаковка по времени.
-// Контракт: buildDay(date, routines, tasks) → DayPlan { date, blocks }
+// календарь дня: рутины занимают таймлайн, в свободные окна подбираются дела.
+// ключевая алгоритмическая часть темы: фильтрация + сортировка + упаковка по времени.
+// контракт: buildDay(date, routines, tasks) → DayPlan { date, blocks }
 
 import { PlanBlock } from './models.js';
 
 const MINUTES_IN_DAY = 24 * 60;
 
-// Сортировка дел при подборе: группа Н важнее Ж, Ж важнее П; внутри группы — короткие раньше.
+// сортировка дел при подборе: группа Н важнее Ж, Ж важнее П; внутри группы — короткие раньше.
 const GROUP_PRIORITY = { 'Н': 0, 'Ж': 1, 'П': 2 };
 
 export function sortCandidates(tasks) {
@@ -17,7 +17,7 @@ export function sortCandidates(tasks) {
   });
 }
 
-// Уровень энергии пользователя меняет стратегию подбора дел:
+// уровень энергии пользователя меняет стратегию подбора дел:
 // low — уставшему нужны лёгкие: первыми короткие (<=30 мин), затем важность группы;
 // high — на подъёме берём большие дела: внутри группы длинные вперёд.
 const LIGHT_MAX = 30;
@@ -43,14 +43,14 @@ export function adaptiveSort(tasks, energy) {
   return sortCandidates(tasks);
 }
 
-// Сколько дел автоукладка ставит за раз: уставшему — не больше трёх,
+// сколько дел автоукладка ставит за раз: уставшему — не больше трёх,
 // остальное подождёт и не давит
 export function autoPlaceLimit(energy) {
   return energy === 'low' ? 3 : Infinity;
 }
 
 /**
- * Одна рекомендация «что сейчас»: свободное окно, содержащее текущую минуту
+ * одна рекомендация «что сейчас»: свободное окно, содержащее текущую минуту
  * (или ближайшее впереди), и первое подходящее по длительности и энергии дело.
  */
 export function recommendNow(windows, tasks, nowMin, energy) {
@@ -68,7 +68,7 @@ export function recommendNow(windows, tasks, nowMin, energy) {
   return { task, start, end: start + task.durationMin, window: win };
 }
 
-// Практики дня в блоки занятости; через полночь (end <= start) разбивается на два.
+// практики дня в блоки занятости; через полночь (end <= start) разбивается на два.
 // id практики переносится в блоки — по нему таймлайн открывает редактирование
 export function practicesToBlocks(practices) {
   const out = [];
@@ -83,7 +83,7 @@ export function practicesToBlocks(practices) {
   return out;
 }
 
-// Все свободные промежутки между блоками
+// все свободные промежутки между блоками
 export function computeFreeWindows(blocks) {
   const sorted = [...blocks].sort((a, b) => a.start - b.start);
   const out = [];
@@ -96,13 +96,13 @@ export function computeFreeWindows(blocks) {
   return out;
 }
 
-// Первое свободное окно, куда влезает дело длительностью durationMin: [start, end] или null
+// первое свободное окно, куда влезает дело длительностью durationMin: [start, end] или null
 export function findFreeWindow(blocks, durationMin) {
   const w = computeFreeWindows(blocks).find((x) => x.end - x.start >= durationMin);
   return w ? [w.start, w.start + durationMin] : null;
 }
 
-// Можно ли поставить дело на start: без пересечений с занятостью и в пределах дня.
+// можно ли поставить дело на start: без пересечений с занятостью и в пределах дня.
 // ignoreTaskId — блок самого перетаскиваемого дела (себя не считаем)
 export function canPlaceAt(occupancy, start, durationMin, ignoreTaskId = null) {
   const end = start + durationMin;
@@ -114,7 +114,7 @@ export function canPlaceAt(occupancy, start, durationMin, ignoreTaskId = null) {
 }
 
 /**
- * Собирает план дня.
+ * собирает план дня.
  * @param {string} date 'YYYY-MM-DD'
  * @param {Array<{start:number,end:number,label:string}>} routines рутины из практик
  * @param {Array<Task>} tasks дела со статусом 'todo'
@@ -134,7 +134,7 @@ export function buildDay(date, routines, tasks, { sort = sortCandidates } = {}) 
     }
   }
 
-  // Жадная упаковка: кандидаты по стратегии сортировки, каждый — в первое свободное окно
+  // жадная упаковка: кандидаты по стратегии сортировки, каждый — в первое свободное окно
   const candidates = sort(tasks);
   const placedIds = new Set();
 

@@ -1,4 +1,4 @@
-// Экран «День»: собственный таймлайн (рутины и поставленные дела) вместо
+// экран «День»: собственный таймлайн (рутины и поставленные дела) вместо
 // календарной сетки. Расстановка: тапом по пустому часу (основной способ,
 // работает и на телефоне), перетаскиванием карточки, растягиванием за нижний
 // край, кликом в колонке дел или автоматически.
@@ -23,7 +23,7 @@ const WELCOME_KEY = 'daylik-welcome';
 const PX_PER_MIN = 64 / 60; // высота часа таймлайна, px
 const MINUTES = 1440;
 
-// Раскладка пересекающихся блоков по «дорожкам»: кластеры перекрытий
+// раскладка пересекающихся блоков по «дорожкам»: кластеры перекрытий
 // нумеруются отдельно, дорожек в кластере — сколько нужно
 function layoutBlocks(blocks) {
   const sorted = [...blocks].sort((a, b) => a.start - b.start);
@@ -96,7 +96,7 @@ export function initDayScreen(root) {
   let pickAt = null;    // минута выбранного на таймлайне окна (выбор дела)
   let scrolledToNow = false;
 
-  // Каркас живёт всё время экрана: шапка и колонка перерисовываются,
+  // каркас живёт всё время экрана: шапка и колонка перерисовываются,
   // таймлайн перерисовывается вместе с ними
   root.innerHTML = `
     <div id="day-top"></div>
@@ -111,7 +111,7 @@ export function initDayScreen(root) {
   const modalEl = root.querySelector('#day-modal');
   const scrollEl = root.querySelector('#tl-scroll');
 
-  // ---------- сбор данных и отрисовка ----------
+  // сбор данных и отрисовка
 
   async function render() {
     // набранный, но не отправленный текст быстрого ввода переживает перерисовку
@@ -236,7 +236,7 @@ export function initDayScreen(root) {
       </details>` : ''}`;
   }
 
-  // Общая подпись дела: бейдж группы, название, длительность, метка направления
+  // общая подпись дела: бейдж группы, название, длительность, метка направления
   const taskLabel = (task, suffix = '') =>
     `<span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)} <span class="muted">${task.durationMin} ${t('task.minutes')}`
     + (task.sphereId && state.sphereNames[task.sphereId] ? ` · ${escapeHtml(state.sphereNames[task.sphereId])}` : '')
@@ -309,7 +309,7 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // Карточка блока дня: правка существующей рутины (создание — на «Направлениях»)
+  // карточка блока дня: правка существующей рутины (создание — на «Направлениях»)
   function routineEditorHtml(p) {
     return `
       <div class="card">
@@ -345,7 +345,7 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // ---------- таймлайн дня ----------
+  // таймлайн дня
 
   function timelineHtml(laid) {
     const hours = Array.from({ length: 24 }, (_, h) =>
@@ -377,7 +377,7 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // Выбор дела на выбранное время: основной способ расстановки — тап,
+  // выбор дела на выбранное время: основной способ расстановки — тап,
   // работает и мышью, и пальцем (drag — дополнение для мыши)
   function pickerHtml(startMin) {
     const fits = (x) => x.durationMin <= MINUTES - startMin;
@@ -413,7 +413,7 @@ export function initDayScreen(root) {
     render();
   }
 
-  // ---------- таймлайн: тап-выбор, перенос и растягивание ----------
+  // таймлайн: тап-выбор, перенос и растягивание
 
   function canvas() {
     return root.querySelector('#tl-canvas');
@@ -519,7 +519,7 @@ export function initDayScreen(root) {
     root.closest('main')?.scrollTo?.({ top: 0, behavior: 'smooth' });
   }
 
-  // ---------- обработчики ----------
+  // обработчики
 
   root.addEventListener('click', async (e) => {
     if (e.target.classList.contains('modal-overlay')) {
@@ -767,7 +767,7 @@ export function initDayScreen(root) {
     if (e.target.id === 'quick-add' && e.key === 'Enter') quickAdd();
   });
 
-  // Быстрый ввод с экрана дня: тот же гибридный разбор, дело создаётся сразу
+  // быстрый ввод с экрана дня: тот же гибридный разбор, дело создаётся сразу
   async function quickAdd() {
     const input = root.querySelector('#quick-add');
     const msg = root.querySelector('#quick-msg');

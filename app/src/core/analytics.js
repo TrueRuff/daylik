@@ -1,4 +1,4 @@
-// Аналитика дня: сводка по плану/факту/свободному времени поверх готовых алгоритмов.
+// аналитика дня: сводка по плану/факту/свободному времени поверх готовых алгоритмов.
 
 import { computeFreeWindows, practicesToBlocks } from './dayPlan.js';
 import { practiceAppliesOn, weekdayOf } from './schedule.js';
@@ -6,7 +6,7 @@ import { practiceAppliesOn, weekdayOf } from './schedule.js';
 const h = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
 
 /**
- * Сводка дня.
+ * сводка дня.
  * @param {string} date 'YYYY-MM-DD'
  * @param {Array<Task>} todo дела со статусом todo
  * @param {Array<Task>} done завершённые

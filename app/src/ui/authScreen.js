@@ -1,5 +1,5 @@
-// Экран входа: вход в существующий аккаунт или создание нового.
-// После успеха вызывает onSuccess(account) — main.js показывает приложение.
+// экран входа: вход в существующий аккаунт или создание нового.
+// после успеха вызывает onSuccess(account) — main.js показывает приложение.
 
 import { login, register, ensureBuiltinAdmin } from '../core/auth.js';
 import { t, onChange } from '../core/i18n.js';
