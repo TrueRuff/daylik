@@ -51,9 +51,7 @@ docker tag  docker.m.daocloud.io/library/nginx:alpine nginx:alpine
 ```
 app/
 ├── index.html            — точка входа браузера
-├── public/               — PWA: манифест, service worker, иконки
-├── scripts/
-│   └── make-icons.mjs    — генератор PNG-иконок без библиотек
+├── public/               — PWA: манифест, service worker, иконки, скриншоты обзора
 ├── electron/
 │   └── main.cjs          — главный процесс Electron
 ├── Dockerfile, nginx.conf, docker-compose.yml — web-версия в контейнере
