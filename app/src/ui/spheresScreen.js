@@ -23,6 +23,23 @@ const EXAMPLES = [
 
 const DRAG_THRESHOLD = 6;
 
+// Форма блока дня (рутины без направления: сон, еда). Редактирование —
+// кликом по блоку на «Дне», создание живёт здесь.
+function blockFormHtml() {
+  return `
+    <div class="card">
+      <h3>${t('routine.edit')}</h3>
+      <p class="muted">${t('routine.hint')}</p>
+      <label>${t('common.title')} <input id="b-title" placeholder="${t('input.placeholder')}"></label>
+      ${timeRangeFields('23:00', '07:00')}
+      <div class="days">${daysCheckboxes()}</div>
+      <div class="row">
+        <button id="block-save">${t('common.save')}</button>
+        <button id="block-cancel" class="secondary">${t('common.close')}</button>
+      </div>
+    </div>`;
+}
+
 export function initSpheresScreen(root) {
   let drag = null; // перетаскивание карточки между колонками
 
@@ -58,6 +75,8 @@ export function initSpheresScreen(root) {
           <span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
           <button class="del-free-practice" data-id="${p.id}" title="${t('common.delete')}">×</button>
         </div>`).join('')}` : ''}
+      <p><button id="new-block" class="secondary">${t('day.addRoutine')}</button></p>
+      <div id="block-form"></div>
       <h3>${t('data.title')}</h3>
       <div class="row">
         <button id="export-json" class="secondary">${t('data.exportJson')}</button>
@@ -291,6 +310,35 @@ export function initSpheresScreen(root) {
 
     if (e.target.classList.contains('del-free-practice')) {
       await deletePractice(e.target.dataset.id);
+      await renderList();
+      return;
+    }
+
+    if (e.target.id === 'new-block') {
+      const el = root.querySelector('#block-form');
+      el.innerHTML = el.innerHTML ? '' : blockFormHtml();
+      if (el.innerHTML) el.querySelector('#b-title')?.focus();
+      return;
+    }
+
+    if (e.target.id === 'block-cancel') {
+      root.querySelector('#block-form').innerHTML = '';
+      return;
+    }
+
+    if (e.target.id === 'block-save') {
+      const title = root.querySelector('#b-title').value.trim();
+      const days = [...root.querySelectorAll('#block-form .days input:checked')].map((c) => Number(c.dataset.day));
+      if (!title || !days.length) return;
+      const form = root.querySelector('#block-form');
+      await savePractice(new Practice({
+        id: crypto.randomUUID(),
+        sphereId: null,
+        title,
+        days,
+        start: timeToMinutes(form.querySelector('.js-start').value || '23:00'),
+        end: timeToMinutes(form.querySelector('.js-end').value || '07:00'),
+      }));
       await renderList();
       return;
     }

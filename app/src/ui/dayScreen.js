@@ -22,6 +22,7 @@ import { t, getLang, onChange } from '../core/i18n.js';
 import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
 
 const ENERGY_KEY = 'daylik-energy';
+const WELCOME_KEY = 'daylik-welcome';
 
 function todayWeekday() {
   return ((new Date().getDay() + 6) % 7) + 1; // 1 = понедельник
@@ -40,6 +41,16 @@ function saveEnergy(v) {
     localStorage.setItem(ENERGY_KEY, v);
   } catch {
     // сохранение не критично
+  }
+}
+
+// короткая инструкция показывается один раз; если хранилище недоступно —
+// не показываем, чтобы не раздражать постоянной карточкой
+function welcomeSeen() {
+  try {
+    return localStorage.getItem(WELCOME_KEY) === '1';
+  } catch {
+    return true;
   }
 }
 
@@ -128,25 +139,32 @@ export function initDayScreen(root) {
           <h2>${t('day.title')}</h2>
           <p class="day-date">${dateLabel}</p>
         </div>
-        <button id="what-now" class="secondary">${t('day.whatNow')}</button>
+        <button id="what-now">${t('day.whatNow')}</button>
       </div>
-      <div class="row between">
-        <span class="muted">${t('energy.label')}:
-          ${['low', 'normal', 'high'].map((e) =>
-            `<button class="grp energy${e === energy ? ' on' : ''}" data-energy="${e}">${t(`energy.${e}`)}</button>`).join('')}
-        </span>
-        <span class="row">
-          <button id="add-routine" class="secondary">${t('day.addRoutine')}</button>
-          <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
-        </span>
-      </div>
-      <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
-      ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
+      ${welcomeSeen() ? '' : `
+      <div class="card welcome">
+        <strong>${t('welcome.title')}</strong>
+        <ol>
+          <li>${t('welcome.step1')}</li>
+          <li>${t('welcome.step2')}</li>
+          <li>${t('welcome.step3')}</li>
+        </ol>
+        <button id="welcome-ok">${t('welcome.ok')}</button>
+      </div>`}
       <div class="input-row">
         <input id="quick-add" placeholder="${t('day.quickAdd')}">
         <button id="quick-save" class="secondary">+</button>
       </div>
       <p id="quick-msg" class="muted"></p>
+      <div class="row between">
+        <span class="muted">${t('energy.label')}:
+          ${['low', 'normal', 'high'].map((e) =>
+            `<button class="grp energy${e === energy ? ' on' : ''}" data-energy="${e}">${t(`energy.${e}`)}</button>`).join('')}
+        </span>
+        <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
+      </div>
+      <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
+      ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
       ${overdue.length ? `
       <div class="card overdue-box">
         <span>${t('day.overdue', { n: overdue.length })}</span>
@@ -158,7 +176,7 @@ export function initDayScreen(root) {
     const modalHtml = editTask
       ? editCardHtml(editTask, spheres)
       : (editPractice !== null
-        ? routineEditorHtml(editPractice === 'new' ? null : state.practices.find((p) => p.id === editPractice))
+        ? routineEditorHtml(state.practices.find((p) => p.id === editPractice))
         : '');
     modalEl.hidden = !modalHtml;
     modalEl.innerHTML = modalHtml ? `<div class="modal-overlay"><div class="modal-card">${modalHtml}</div></div>` : '';
@@ -248,9 +266,8 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // Карточка блока дня: создание нового или правка существующей рутины
+  // Карточка блока дня: правка существующей рутины (создание — на «Направлениях»)
   function routineEditorHtml(p) {
-    const isNew = !p;
     return `
       <div class="card">
         <div class="row between">
@@ -260,10 +277,10 @@ export function initDayScreen(root) {
         <p class="muted">${t('routine.hint')}</p>
         <label>${t('common.title')} <input id="r-title" value="${escapeHtml(p?.title || '')}" placeholder="${t('input.placeholder')}"></label>
         ${timeRangeFields(p ? minutesToTime(p.start) : '23:00', p ? minutesToTime(p.end) : '07:00')}
-        <div class="days">${daysCheckboxes(isNew ? undefined : p.days)}</div>
+        <div class="days">${daysCheckboxes(p?.days)}</div>
         <div class="row">
           <button id="routine-save" data-id="${p?.id || ''}">${t('common.save')}</button>
-          ${isNew ? '' : `<button id="routine-delete" data-id="${p.id}" class="danger">${t('common.delete')}</button>`}
+          ${p ? `<button id="routine-delete" data-id="${p.id}" class="danger">${t('common.delete')}</button>` : ''}
         </div>
       </div>`;
   }
@@ -444,9 +461,12 @@ export function initDayScreen(root) {
       return;
     }
 
-    if (e.target.closest('#add-routine')) {
-      editPractice = 'new';
-      pickerToTop();
+    if (e.target.closest('#welcome-ok')) {
+      try {
+        localStorage.setItem(WELCOME_KEY, '1');
+      } catch {
+        // сохранение не критично
+      }
       render();
       return;
     }

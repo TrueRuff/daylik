@@ -178,6 +178,10 @@ nav button.active { background: var(--accent-soft); color: var(--accent); }
 .icon-btn svg { width: 17px; height: 17px; }
 .icon-btn:hover { background: var(--accent-soft); color: var(--ink); opacity: 1; }
 
+/* «+ Добавить» — заметная кнопка ввода в шапке */
+#add { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+#add:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
 main {
   flex: 1;
   min-width: 0;
@@ -494,6 +498,12 @@ select { width: auto; min-width: 150px; }
   border-radius: 12px;
 }
 
+/* приветственная карточка первого запуска */
+.welcome { border-color: var(--accent-soft); }
+.welcome ol { margin: 8px 0 12px; padding-left: 20px; }
+.welcome li { margin: 5px 0; font-size: 13.5px; }
+.welcome strong { font-size: 14px; }
+
 /* ---------- направления: деревья/ветки ---------- */
 /* Колонка — ствол с цветом группы, направления — листья на коротких черешках */
 
@@ -615,7 +625,7 @@ select { width: auto; min-width: 150px; }
 }
 .area-task-done:hover { background: var(--success-soft); border-color: var(--success-line); opacity: 1; }
 
-/* ---------- модальное окно (карточки дела и блока дня) ---------- */
+/* ---------- модальное окно (карточки дела, блока дня и «Добавить») ---------- */
 
 .modal-overlay {
   position: fixed;
@@ -641,6 +651,7 @@ select { width: auto; min-width: 150px; }
 }
 /* карточка внутри модалки рисует только модалка */
 .modal-card .card { border: none; background: none; box-shadow: none; padding: 0; margin: 0; }
+.modal-head { margin: 0 0 4px; }
 @keyframes modal-in {
   from { opacity: 0; transform: translateY(8px) scale(.98); }
   to { opacity: 1; transform: none; }
@@ -761,18 +772,17 @@ select { width: auto; min-width: 150px; }
 
 @media (max-width: 900px) {
   .app { flex-direction: column; }
-  /* два ряда: логотип + инструменты, ниже — прокручиваемые вкладки */
+  /* верхняя панель: логотип и инструменты */
   .sidebar {
     width: 100%;
     height: auto;
-    position: sticky; /* навигация всегда под рукой при скролле */
+    position: sticky;
     top: 0;
     z-index: 20;
     flex-direction: row;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 4px 10px;
-    padding: 10px 12px 6px;
+    gap: 8px;
+    padding: 10px 12px;
     border-right: none;
     border-bottom: 1px solid var(--line);
   }
@@ -783,20 +793,36 @@ select { width: auto; min-width: 150px; }
   .side-user #logout { margin-left: 0; padding: 8px 14px; }
   .side-tools { border-top: none; padding-top: 0; }
   .icon-btn { width: 42px; height: 40px; }
-  nav {
-    order: 3;
-    flex-basis: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 2px;
-    padding-bottom: 6px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* вкладки листаются пальцем без полосы */
-  }
-  nav::-webkit-scrollbar { display: none; }
-  nav button { flex: none; min-height: 44px; padding: 9px 16px; font-size: 14px; }
 
-  main { padding: 16px 14px 70px; }
+  /* нижняя навигация: вкладки всегда под большим пальцем, как в
+     нативных приложениях; отступ снизу — под «панель жестов» iPhone */
+  nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    flex-direction: row;
+    gap: 2px;
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--line);
+    padding: 4px 6px calc(5px + env(safe-area-inset-bottom));
+  }
+  nav button {
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    padding: 5px 2px;
+    font-size: 11.5px;
+    border-radius: 10px;
+  }
+  nav button svg { width: 22px; height: 22px; }
+  nav button.active { background: none; }
+
+  main { padding: 16px 14px 104px; }
   h2 { font-size: 21px; }
   .sphere-cols, .day-wrap { grid-template-columns: 1fr; }
   .day-wrap { gap: 14px; }
@@ -814,7 +840,7 @@ select { width: auto; min-width: 150px; }
   .day input { width: 18px; height: 18px; }
   #quick-save { width: 48px; }
   .practice-row { padding: 12px 0; }
-  .modal-overlay { padding: 5vh 10px 16px; }
+  .modal-overlay { padding: 5vh 10px calc(16px + env(safe-area-inset-bottom)); }
   .fc { font-size: 12.5px; }
   .input-row { flex-wrap: nowrap; }
 }

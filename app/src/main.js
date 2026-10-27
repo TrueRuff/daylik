@@ -5,7 +5,7 @@ import '@fontsource-variable/inter';
 import { initDayScreen } from './ui/dayScreen.js';
 import { initCalendarScreen } from './ui/calendarScreen.js';
 import { initSpheresScreen } from './ui/spheresScreen.js';
-import { initInputScreen } from './ui/inputScreen.js';
+import { openAddModal } from './ui/inputScreen.js';
 import { initLogScreen } from './ui/logScreen.js';
 import { initAuthScreen } from './ui/authScreen.js';
 import { startReminderLoop, fireNotification, requestPermission } from './core/reminders.js';
@@ -18,7 +18,6 @@ const screens = {
   day: document.getElementById('tab-day'),
   calendar: document.getElementById('tab-calendar'),
   spheres: document.getElementById('tab-spheres'),
-  input: document.getElementById('tab-input'),
   log: document.getElementById('tab-log'),
 };
 
@@ -28,14 +27,17 @@ const whoEl = document.getElementById('who');
 const avatarEl = document.getElementById('who-avatar');
 const logoutBtn = document.getElementById('logout');
 const langBtn = document.getElementById('lang');
+const addBtn = document.getElementById('add');
 const logTabBtn = document.querySelector('nav button[data-tab="log"]');
+
+// «+ Добавить» — единственный путь к полному вводу (экрана «Ввод» больше нет)
+addBtn.addEventListener('click', openAddModal);
 
 initLog();
 
 initDayScreen(screens.day);
 initCalendarScreen(screens.calendar);
 initSpheresScreen(screens.spheres);
-initInputScreen(screens.input);
 initLogScreen(screens.log);
 
 const buttons = document.querySelectorAll('nav button');
@@ -62,6 +64,11 @@ buttons.forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.tab === 'log' && !isAdmin(account)) return; // журнал — только админу
   showTab(b.dataset.tab);
 }));
+
+// модалка «Добавить» сохранила данные — перерисовать активный экран
+document.addEventListener('data-changed', () => {
+  if (account) showTab(currentTab);
+});
 
 // Свайпы на телефоне: горизонтальный жест листает вкладки. Жесты, нужные
 // самим экранам (календарь, перетаскивание дел, поля ввода), исключены.
@@ -102,6 +109,7 @@ function enterApp(acc) {
   avatarEl.textContent = (acc.login[0] || '?').toUpperCase();
   logoutBtn.hidden = false;
   langBtn.hidden = false;
+  addBtn.hidden = false;
   themeBtn.hidden = false;
   logTabBtn.hidden = !isAdmin(acc);
   refreshBell();
@@ -117,6 +125,7 @@ function showLogin() {
   avatarEl.hidden = true;
   logoutBtn.hidden = true;
   langBtn.hidden = true;
+  addBtn.hidden = true;
   authScreen.show();
 }
 

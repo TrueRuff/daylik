@@ -39,10 +39,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.8l-1.8 4.6-4.6 1.8 1.8-4.6z"/></svg>
             <span data-i18n="nav.spheres">Направления</span>
           </button>
-          <button data-tab="input">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>
-            <span data-i18n="nav.input">Ввод</span>
-          </button>
           <button data-tab="log" hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h.01M5 12h.01M5 18h.01M9.5 6H19M9.5 12H19M9.5 18H19"/></svg>
             <span data-i18n="nav.log">Журнал</span>
@@ -55,6 +51,9 @@
             <button id="logout" class="secondary" data-i18n="auth.logout" hidden>Выйти</button>
           </div>
           <div class="side-tools">
+            <button id="add" class="icon-btn add-btn" data-i18n-title="input.title" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
+            </button>
             <button id="lang" class="icon-btn" hidden>EN</button>
             <button id="theme" class="icon-btn" data-i18n-title="theme.toggle" hidden>☾</button>
             <button id="bell" class="icon-btn" data-i18n-title="bell.enable" hidden>
@@ -67,7 +66,6 @@
         <section id="tab-day" hidden></section>
         <section id="tab-calendar" hidden></section>
         <section id="tab-spheres" hidden></section>
-        <section id="tab-input" hidden></section>
         <section id="tab-log" hidden></section>
       </main>
     </div>
