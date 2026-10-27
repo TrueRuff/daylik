@@ -1,12 +1,8 @@
-// Экран «День»: календарь FullCalendar (вид день) — рутины и поставленные
-// дела. Расстановка: перетаскиванием из колонки дел, перенос/растягивание
-// событий, кликом (первое подходящее окно) или автоматически.
+// Экран «День»: собственный таймлайн (рутины и поставленные дела) вместо
+// календарной сетки. Расстановка: тапом по пустому часу (основной способ,
+// работает и на телефоне), перетаскиванием карточки, растягиванием за нижний
+// край, кликом в колонке дел или автоматически.
 
-import { Calendar } from '@fullcalendar/core';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import { Draggable } from '@fullcalendar/interaction';
-import ruLocale from '@fullcalendar/core/locales/ru';
-import enLocale from '@fullcalendar/core/locales/en-gb';
 import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask, savePractice, deletePractice, saveTask } from '../core/storage.js';
 import { categorize } from '../core/categorize.js';
 import { breakdownWithLlm } from '../ai/llmClient.js';
@@ -15,7 +11,7 @@ import {
   buildDay, computeFreeWindows, practicesToBlocks,
   adaptiveSort, autoPlaceLimit, recommendNow,
 } from '../core/dayPlan.js';
-import { eventsForRange, GROUP_COLORS } from '../core/calendarEvents.js';
+import { GROUP_COLORS } from '../core/calendarEvents.js';
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
 import { t, getLang, onChange } from '../core/i18n.js';
@@ -23,6 +19,42 @@ import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields, timeSelect }
 
 const ENERGY_KEY = 'daylik-energy';
 const WELCOME_KEY = 'daylik-welcome';
+
+const PX_PER_MIN = 64 / 60; // высота часа таймлайна, px
+const MINUTES = 1440;
+
+function fmtTime(min) {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(Math.round(min) % 60).padStart(2, '0')}`;
+}
+
+// Раскладка пересекающихся блоков по «дорожкам»: кластеры перекрытий
+// нумеруются отдельно, дорожек в кластере — сколько нужно
+function layoutBlocks(blocks) {
+  const sorted = [...blocks].sort((a, b) => a.start - b.start);
+  const out = [];
+  let cluster = [];
+  let clusterEnd = -1;
+  const flush = () => {
+    if (!cluster.length) return;
+    const laneEnd = [];
+    const laid = cluster.map((b) => {
+      let lane = laneEnd.findIndex((e) => e <= b.start);
+      if (lane === -1) lane = laneEnd.length;
+      laneEnd[lane] = b.end;
+      return { ...b, lane };
+    });
+    laid.forEach((b) => out.push({ ...b, lanes: laneEnd.length }));
+    cluster = [];
+    clusterEnd = -1;
+  };
+  for (const b of sorted) {
+    if (cluster.length && b.start >= clusterEnd) flush();
+    cluster.push(b);
+    clusterEnd = Math.max(clusterEnd, b.end);
+  }
+  flush();
+  return out;
+}
 
 function todayWeekday() {
   return ((new Date().getDay() + 6) % 7) + 1; // 1 = понедельник
@@ -65,15 +97,15 @@ export function initDayScreen(root) {
   let energy = loadEnergy();
   let whatNow = null;   // рекомендация «что сейчас»
   let editPractice = null; // id редактируемого блока дня (рутины)
-  let calendar = null;
-  let currentEvents = [];
+  let pickAt = null;    // минута выбранного на таймлайне окна (выбор дела)
+  let scrolledToNow = false;
 
   // Каркас живёт всё время экрана: шапка и колонка перерисовываются,
-  // календарь (FullCalendar) не пересоздаётся — только обновляет события
+  // таймлайн перерисовывается вместе с ними
   root.innerHTML = `
     <div id="day-top"></div>
     <div class="day-wrap">
-      <div id="cal-wrap"><div id="cal"></div></div>
+      <div id="cal-wrap"><div class="tl-scroll" id="tl-scroll"></div></div>
       <div class="side" id="side"></div>
     </div>
     <div id="day-modal" hidden></div>`;
@@ -81,6 +113,7 @@ export function initDayScreen(root) {
   const topEl = root.querySelector('#day-top');
   const sideEl = root.querySelector('#side');
   const modalEl = root.querySelector('#day-modal');
+  const scrollEl = root.querySelector('#tl-scroll');
 
   // ---------- сбор данных и отрисовка ----------
 
@@ -111,6 +144,7 @@ export function initDayScreen(root) {
         kind: 'task',
         label: x.title,
         taskId: x.id,
+        group: x.group,
       })),
     ].sort((a, b) => a.start - b.start);
 
@@ -126,8 +160,13 @@ export function initDayScreen(root) {
     state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices, todo,
       sphereNames: Object.fromEntries(spheres.map((s) => [s.id, s.name])) };
 
-    currentEvents = eventsForRange(date, date, practices, scheduled);
-    calendar?.refetchEvents();
+    scrollEl.innerHTML = timelineHtml(layoutBlocks(blocks));
+    // прокрутка к «сейчас»: на скрытом экране (под формой входа) scrollTop
+    // не работает, поэтому ждём, пока экран реально виден
+    if (!scrolledToNow && scrollEl.offsetHeight > 0) {
+      scrolledToNow = true;
+      scrollEl.scrollTop = Math.max(0, (nowMinutes() - 120) * PX_PER_MIN);
+    }
 
     // шапка дня: «Сегодня» + локализованная дата
     const dateLabel = new Date().toLocaleDateString(getLang() === 'en' ? 'en-GB' : 'ru-RU',
@@ -172,12 +211,12 @@ export function initDayScreen(root) {
       </div>` : ''}
       ${whatNow === 'empty' ? `<div class="card"><p class="muted">${t('day.whatNowEmpty')}</p></div>` : whatNow ? whatNowHtml(whatNow) : ''}`;
 
-    // карточки правки (дело, блок дня) живут в модальном окне поверх экрана
+    // карточки правки (дело, блок дня) и выбор дела на время живут в модальном окне
     const modalHtml = editTask
       ? editCardHtml(editTask, spheres)
       : (editPractice !== null
         ? routineEditorHtml(state.practices.find((p) => p.id === editPractice))
-        : '');
+        : (pickAt !== null ? pickerHtml(pickAt) : ''));
     modalEl.hidden = !modalHtml;
     modalEl.innerHTML = modalHtml ? `<div class="modal-overlay"><div class="modal-card">${modalHtml}</div></div>` : '';
 
@@ -186,15 +225,14 @@ export function initDayScreen(root) {
       ${unscheduled.length
         ? [...placeable, ...notFitting].map((x) => taskRowHtml(x, fits(x))).join('')
         : `<p class="muted">${t('day.noTasks')}</p>`}
-      <details class="done-box" ${done.length ? '' : ''}>
+      ${done.length ? `
+      <details class="done-box">
         <summary>${t('day.doneCount', { n: done.length })}</summary>
-      ${done.length
-        ? done.slice(0, 15).map((task) => `
+        ${done.slice(0, 15).map((task) => `
           <button class="done-item" data-id="${task.id}" title="${t('task.return')}">
             <span class="badge g-${task.group}">${task.group}</span>${escapeHtml(task.title)}
-          </button>`).join('')
-        : `<p class="muted">${t('day.nothingDone')}</p>`}
-      </details>`;
+          </button>`).join('')}
+      </details>` : ''}`;
   }
 
   // Общая подпись дела: бейдж группы, название, длительность, метка направления
@@ -306,6 +344,58 @@ export function initDayScreen(root) {
       </div>`;
   }
 
+  // ---------- таймлайн дня ----------
+
+  function timelineHtml(laid) {
+    const hours = Array.from({ length: 24 }, (_, h) =>
+      `<div class="tl-hour" style="top:${h * 60 * PX_PER_MIN}px"><span>${String(h).padStart(2, '0')}</span></div>`).join('');
+    const cards = laid.map((b) => {
+      const top = b.start * PX_PER_MIN;
+      const height = (Math.min(b.end, MINUTES) - b.start) * PX_PER_MIN;
+      const width = 100 / b.lanes;
+      const left = b.lane * width;
+      const style = `top:${top}px;height:${height}px;left:${left}%;width:calc(${width}% - 8px)`;
+      if (b.kind === 'routine') {
+        return `<div class="tl-card routine" data-practice="${b.id}" style="${style}">
+          <span class="tl-time">${fmtTime(b.start)}–${fmtTime(Math.min(b.end, MINUTES))}</span>
+          <span class="tl-title">↻ ${escapeHtml(b.label)}</span>
+        </div>`;
+      }
+      return `<div class="tl-card task" data-task="${b.taskId}" data-g="${b.group}" style="${style};background:${GROUP_COLORS[b.group] ?? 'var(--accent)'}">
+        <span class="tl-time">${fmtTime(b.start)}–${fmtTime(Math.min(b.end, MINUTES))}</span>
+        <span class="tl-title">${escapeHtml(b.label)}</span>
+        <span class="tl-resize" data-resize="${b.taskId}"></span>
+      </div>`;
+    }).join('');
+    return `
+      <div class="tl">
+        <div class="tl-gutter">${hours}</div>
+        <div class="tl-canvas" id="tl-canvas" title="${t('day.tapHint')}">${cards}
+          <div class="tl-now" style="top:${nowMinutes() * PX_PER_MIN}px"></div>
+        </div>
+      </div>`;
+  }
+
+  // Выбор дела на выбранное время: основной способ расстановки — тап,
+  // работает и мышью, и пальцем (drag — дополнение для мыши)
+  function pickerHtml(startMin) {
+    const fits = (x) => x.durationMin <= MINUTES - startMin;
+    const list = [...adaptiveSort(state.unscheduled.filter(fits), energy),
+      ...state.unscheduled.filter((x) => !fits(x))];
+    return `
+      <div class="card">
+        <div class="row between">
+          <strong>${t('day.placeAt', { time: fmtTime(startMin) })}</strong>
+          <button id="pick-close" class="secondary">${t('common.close')}</button>
+        </div>
+        ${list.length ? list.map((x) => `
+          <button class="pick-task" data-id="${x.id}">
+            <span class="badge g-${x.group}">${x.group}</span>${escapeHtml(x.title)}
+            <span class="muted">${x.durationMin} ${t('task.minutes')}${fits(x) ? '' : ` — ${t('day.notFit')}`}</span>
+          </button>`).join('') : `<p class="muted">${t('day.pickEmpty')}</p>`}
+      </div>`;
+  }
+
   async function autoPlace() {
     const { date, routines, scheduled, unscheduled } = state;
     const occupancy = [
@@ -322,107 +412,110 @@ export function initDayScreen(root) {
     render();
   }
 
-  // ---------- календарь FullCalendar ----------
+  // ---------- таймлайн: тап-выбор, перенос и растягивание ----------
 
-  // Локаль — единственная опция, которую нельзя менять на лету: при смене
-  // языка календарь пересоздаётся (события подтянутся через events-функцию)
-  function buildCalendar() {
-    calendar?.destroy();
-    calendar = new Calendar(root.querySelector('#cal'), {
-      plugins: [timeGridPlugin],
-      initialView: 'timeGridDay',
-      locale: getLang() === 'en' ? enLocale : ruLocale,
-      headerToolbar: false,
-      allDaySlot: false,
-      slotMinTime: '00:00:00',
-      slotMaxTime: '24:00:00',
-      slotDuration: '00:30:00',
-      slotLabelInterval: '01:00:00',
-      dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' },
-      height: 780,
-      scrollTime: minutesToTime(Math.max(0, nowMinutes() - 90)),
-      nowIndicator: true,
-      snapDuration: '00:05:00',
-      events: (info, success) => success(currentEvents),
-      editable: true,   // перенос и ресайз стоящих событий
-      droppable: true,  // приём дел, перетянутых из колонки (eventReceive)
-  
-      // перенос дела: сохраняем новое время начала
-      eventDrop: async (info) => {
-        const { kind, taskId } = info.event.extendedProps;
-        if (kind !== 'task') {
-          info.revert();
-          return;
-        }
-        const start = info.event.start;
-        await updateTask(taskId, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
-        whatNow = null;
-        render();
-      },
-  
-    // растягивание дела: меняем длительность (шаг 5 мин, в границах модели 5–480)
-    eventResize: async (info) => {
-      const { kind, taskId } = info.event.extendedProps;
-      if (kind !== 'task') {
-        info.revert();
-        return;
-      }
-      const dur = Math.round((info.event.end - info.event.start) / 300000); // 5-мин интервалы
-      if (dur < 1 || dur > 96) {
-        info.revert();
-        return;
-      }
-        await updateTask(taskId, { durationMin: dur * 5 });
-        whatNow = null;
-        render();
-      },
-  
-      // клик по событию: дело — карточка редактирования, рутина — редактор блока
-      eventClick: (info) => {
-        const { kind, taskId, practiceId } = info.event.extendedProps;
-        if (kind === 'task') {
-          editing = taskId;
-          pickerToTop();
-        } else if (practiceId) {
-          editPractice = practiceId;
-          pickerToTop();
-        }
-        render();
-      },
-  
-      // бросок из колонки дел: ставим дело на полученное время
-      eventReceive: async (info) => {
-        const id = info.draggedEl.dataset.id;
-        info.event.remove();
-        const start = info.event.start;
-        if (id && start) {
-          await updateTask(id, { scheduledDate: state.date, scheduledStart: start.getHours() * 60 + start.getMinutes() });
-          whatNow = null;
-        }
-        render();
-      },
-    });
-    calendar.render();
+  function canvas() {
+    return root.querySelector('#tl-canvas');
   }
 
-  buildCalendar();
-  // смена языка пересоздаёт календарь с новой локалью (main.js перерисует
-  // активный экран, события подтянутся заново через events-функцию)
-  onChange(() => buildCalendar());
+  function minuteAt(e) {
+    const r = canvas().getBoundingClientRect();
+    const y = e.clientY - r.top + scrollEl.scrollTop;
+    return Math.max(0, Math.min(MINUTES - 1, y / PX_PER_MIN));
+  }
 
-  // дела из колонки тянутся в календарь (FullCalendar Draggable)
-  new Draggable(sideEl, {
-    itemSelector: '.task-row',
-    eventData: (el) => {
-      const task = (state?.allTasks || []).find((x) => x.id === el.dataset.id);
-      if (!task) return {};
-      return {
-        title: `${task.group} · ${task.title}`,
-        duration: { minutes: task.durationMin },
-        backgroundColor: GROUP_COLORS[task.group] ?? undefined,
-      };
-    },
+  let gesture = null;    // активный жест на карточке дела
+  let skipTlClick = false; // клик после перетаскивания подавляется
+
+  root.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || editing || editPractice || pickAt !== null) return;
+    const resize = e.target.closest('.tl-resize');
+    const card = e.target.closest('.tl-card.task');
+    if (!card) return;
+    const block = state?.blocks.find((b) => b.taskId === card.dataset.task);
+    if (!block) return;
+    gesture = {
+      type: resize ? 'resize' : 'move',
+      id: block.taskId,
+      startY: e.clientY,
+      startMin: block.start,
+      durMin: block.end - block.start,
+      moved: false,
+      card,
+    };
+    try {
+      card.setPointerCapture(e.pointerId);
+    } catch {
+      // события всё равно всплывут до root
+    }
   });
+
+  root.addEventListener('pointermove', (e) => {
+    if (!gesture) return;
+    if (!gesture.moved && Math.abs(e.clientY - gesture.startY) < 6) return;
+    if (!gesture.moved) gesture.moved = true;
+    const delta = Math.round((e.clientY - gesture.startY) / PX_PER_MIN);
+    if (gesture.type === 'move') {
+      const ns = Math.max(0, Math.min(MINUTES - gesture.durMin, Math.round((gesture.startMin + delta) / 5) * 5));
+      gesture.newStart = ns;
+      gesture.card.style.transform = `translateY(${(ns - gesture.startMin) * PX_PER_MIN}px)`;
+      gesture.card.style.opacity = '.85';
+    } else {
+      const nd = Math.max(5, Math.min(480, Math.round((gesture.durMin + delta) / 5) * 5));
+      gesture.newDur = nd;
+      gesture.card.style.height = `${nd * PX_PER_MIN}px`;
+    }
+  });
+
+  root.addEventListener('pointerup', async () => {
+    if (!gesture) return;
+    const g = gesture;
+    gesture = null;
+    if (!g.moved) return; // клик без движения — откроется карточкой редактирования
+    skipTlClick = true;
+    setTimeout(() => { skipTlClick = false; }, 80);
+    g.card.style.transform = '';
+    g.card.style.opacity = '';
+    if (g.type === 'move' && g.newStart !== undefined && g.newStart !== g.startMin) {
+      await updateTask(g.id, { scheduledStart: g.newStart });
+      whatNow = null;
+    } else if (g.type === 'resize' && g.newDur !== undefined && g.newDur !== g.durMin) {
+      await updateTask(g.id, { durationMin: g.newDur });
+      whatNow = null;
+    }
+    render();
+  });
+
+  root.addEventListener('pointercancel', () => {
+    if (!gesture) return;
+    gesture.card.style.transform = '';
+    gesture.card.style.opacity = '';
+    gesture = null;
+  });
+
+  scrollEl.addEventListener('click', async (e) => {
+    if (skipTlClick) return;
+    const card = e.target.closest('.tl-card');
+    if (card) {
+      if (card.classList.contains('routine')) {
+        editPractice = card.dataset.practice;
+      } else {
+        editing = card.dataset.task;
+      }
+      pickerToTop();
+      render();
+      return;
+    }
+    // тап по пустому месту: выбрать дело на это время (шаг 15 мин)
+    if (e.target.closest('#tl-canvas')) {
+      const min = Math.round(minuteAt(e) / 15) * 15;
+      pickAt = Math.min(min, MINUTES - 15);
+      render();
+    }
+  });
+
+  // смена языка перерисовывает экран целиком (main.js)
+  onChange(() => render());
 
   function pickerToTop() {
     root.closest('main')?.scrollTo?.({ top: 0, behavior: 'smooth' });
@@ -434,6 +527,22 @@ export function initDayScreen(root) {
     if (e.target.classList.contains('modal-overlay')) {
       editing = null;
       editPractice = null;
+      pickAt = null;
+      render();
+      return;
+    }
+
+    if (e.target.closest('#pick-close')) {
+      pickAt = null;
+      render();
+      return;
+    }
+
+    const pick = e.target.closest('.pick-task');
+    if (pick && pickAt !== null) {
+      await updateTask(pick.dataset.id, { scheduledDate: state.date, scheduledStart: pickAt });
+      pickAt = null;
+      whatNow = null;
       render();
       return;
     }

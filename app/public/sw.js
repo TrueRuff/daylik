@@ -2,7 +2,7 @@
 // precache — оболочка приложения, /assets/ (именованные сборкой файлы) — cache-first,
 // навигация — сеть с откатом на index.html. Версия кэша меняется при обновлении сборки.
 
-const CACHE = 'daylik-v3';
+const CACHE = 'daylik-v4';
 const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
