@@ -344,118 +344,80 @@ select { width: auto; min-width: 150px; }
 }
 .side { position: sticky; top: 24px; }
 
-/* высота часа --tl-hour = 64px; PX_PER_MIN в dayScreen.js должен совпадать */
-#cal-wrap { --tl-hour: 64px; }
+/* день как вертикальный список (по образцу Sunsama): колонка времени,
+   полноразмерные карточки, свободные окна с «+», разделитель «сейчас» */
 .tl-scroll { max-height: 82vh; overflow-y: auto; overscroll-behavior: contain; }
-.tl { display: flex; }
-.tl-gutter { position: relative; width: 46px; flex: none; }
-.tl-gutter .tl-hour span {
-  position: absolute;
-  right: 10px;
-  transform: translateY(-50%);
+.tl-list { padding: 6px 8px 12px; }
+.tl-row { display: flex; gap: 10px; align-items: stretch; padding: 3px 0; }
+.tl-row.past { opacity: .45; }
+.tl-t {
+  width: 46px;
+  flex: none;
+  padding-top: 9px;
+  text-align: right;
   color: var(--ink-soft);
-  font-size: 11px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
-}
-.tl-hour { position: absolute; left: 0; right: 0; height: 0; }
-.tl-canvas {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  height: calc(24 * var(--tl-hour));
-  /* часовые линии */
-  background: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, var(--tl-hour));
-  cursor: pointer;
 }
 .tl-card {
-  position: absolute;
+  flex: 1;
+  min-width: 0;
   border-radius: 10px;
-  padding: 4px 9px;
-  color: #fff;
-  font-size: 12.5px;
-  line-height: 1.3;
+  padding: 7px 11px;
+  font-size: 13px;
+  line-height: 1.35;
   overflow: hidden;
-  box-shadow: inset 3px 0 0 rgba(255, 255, 255, .35);
   user-select: none;
 }
-.tl-card .tl-time {
-  display: block;
-  font-size: 10.5px;
-  font-weight: 700;
-  opacity: .9;
-  font-variant-numeric: tabular-nums;
-}
-.tl-card .tl-title {
-  display: block;
-  font-weight: 550;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-/* рутина — спокойная карточка без цвета группы, открывается кликом */
+.tl-card .tl-title { display: block; font-weight: 550; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.tl-card .tl-dur { display: block; font-size: 11px; opacity: .85; font-variant-numeric: tabular-nums; }
 .tl-card.routine {
   background: var(--surface-soft);
   color: var(--ink-soft);
   border: 1px solid var(--line-strong);
-  box-shadow: none;
   cursor: pointer;
 }
-/* дело — цвет группы, тянется и растягивается */
-.tl-card.task { cursor: grab; touch-action: none; }
-.tl-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; cursor: ns-resize; }
-.tl-card.task:hover .tl-resize { background: rgba(255, 255, 255, .3); border-radius: 0 0 10px 10px; }
-.tl-now {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-top: 2px solid var(--now);
+.tl-card.task { color: #fff; cursor: grab; touch-action: none; }
+.tl-card.task:hover { filter: brightness(1.07); }
+.tl-free {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: none;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-soft);
+  border-radius: 10px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font);
+}
+.tl-free:hover { background: var(--accent-soft); color: var(--ink); border-color: var(--line-strong); opacity: 1; }
+.tl-plus { font-size: 15px; font-weight: 650; }
+.tl-now-row { align-items: center; }
+.tl-now-row .tl-t { color: var(--now); font-weight: 650; }
+.tl-now-line { flex: 1; border-top: 2px solid var(--now); }
+.tl-row.drop-row .tl-card,
+.tl-row.drop-row .tl-free { box-shadow: 0 0 0 2px var(--accent); }
+
+/* всплывающее время при перетаскивании карточки */
+.drag-time {
+  position: fixed;
+  transform: translate(-50%, -160%);
   pointer-events: none;
-  z-index: 2;
-}
-.tl-now::before {
-  content: '';
-  position: absolute;
-  left: -5px;
-  top: -5px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--now);
-}
-
-.fc { font-size: 13px; }
-.fc .fc-toolbar-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
-.fc .fc-button {
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  color: var(--ink);
-  font-weight: 550;
-  border-radius: var(--radius-sm);
-  box-shadow: none;
-}
-.fc .fc-button:hover { background: var(--accent-soft); border-color: var(--line-strong); color: var(--ink); }
-.fc .fc-button:disabled { background: var(--surface-soft); color: var(--ink-soft); border-color: var(--line); }
-.fc .fc-button-primary:not(:disabled).fc-button-active,
-.fc .fc-button-primary:not(:disabled):active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-
-/* события: цвет заливки задаёт JS (цвета групп), текст всегда белый */
-.fc .fc-event,
-.fc .fc-event .fc-event-main {
-  color: #fff;
+  z-index: 100;
+  background: var(--ink);
+  color: var(--on-ink);
   border-radius: 8px;
-  border-width: 0;
-  font-weight: 550;
-  cursor: pointer;
-  padding-left: 7px;
-  box-shadow: inset 3px 0 0 rgba(255, 255, 255, .35);
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.fc .fc-timegrid-slot { height: 1.7em; }
-.fc .fc-timegrid-slot-label { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.fc-theme-standard td, .fc-theme-standard th { border-color: var(--line); }
-.fc .fc-scrollgrid { border-color: var(--line); }
-.fc .fc-col-header-cell-cushion { color: var(--ink-soft); font-weight: 600; padding: 8px 4px; }
-
-/* индикатор «сейчас» на таймлайне дня — .tl-now (см. секцию выше) */
+/* индикатор «сейчас» на таймлайне дня — строка .tl-now-row (см. выше) */
 
 .fc .fc-daygrid-day.fc-day-today,
 .fc .fc-timegrid-col.fc-day-today { background: var(--accent-soft); }
@@ -836,16 +798,35 @@ select { width: auto; min-width: 150px; }
 
 /* дни недели и прочее */
 
-.days { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
-.day {
+
+/* поле времени: 4 цифры, двоеточие само; пара полей — равные колонки */
+.js-time { width: 96px; font-variant-numeric: tabular-nums; }
+.time-range { display: flex; gap: 10px; }
+.time-range label { flex: 1; }
+.time-range .js-time { width: 100%; }
+.remind-fields label { display: inline-block; margin-right: 12px; }
+/* дни недели: квадратики вплотную, выбор — заливка плитки */
+.days { display: flex; gap: 0; flex-wrap: wrap; margin: 8px 0; }
+.day { position: relative; margin: 0; }
+.day input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.day span {
   display: inline-flex;
-  gap: 5px;
   align-items: center;
-  color: var(--ink);
-  margin: 0;
-  font-size: 13px;
+  justify-content: center;
+  width: 42px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
 }
-.day input { accent-color: var(--accent); }
+.day:first-child span { border-radius: 8px 0 0 8px; }
+.day:last-child span { border-radius: 0 8px 8px 0; }
+.day + .day span { border-left: none; }
+.day input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.day input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 1; }
 .example { font-size: 12px; padding: 4px 11px; }
 
 /* вход в аккаунт */
@@ -953,8 +934,9 @@ select { width: auto; min-width: 150px; }
   .modal-overlay { padding: 5vh 10px calc(16px + env(safe-area-inset-bottom)); }
   .fc { font-size: 12.5px; }
   .tl-scroll { max-height: 62vh; }
-  .tl-gutter { width: 36px; }
-  .tl-gutter .tl-hour span { right: 6px; font-size: 10px; }
-  .tl-card { font-size: 12px; padding: 3px 7px; }
+  .tl-card { font-size: 12.5px; padding: 6px 9px; }
+  .tl-t { width: 38px; font-size: 10.5px; }
+  .day span { width: 44px; height: 40px; font-size: 13px; }
+  .js-time { width: 100%; }
   .input-row { flex-wrap: nowrap; }
 }

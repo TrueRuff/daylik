@@ -5,9 +5,12 @@
 import { categorize } from '../core/categorize.js';
 import { Task, Sphere, Practice } from '../core/models.js';
 import { saveTask, saveSphere, savePractice, getAllSpheres } from '../core/storage.js';
-import { timeToMinutes, localInputToTs } from '../core/schedule.js';
+import { timeToMinutes } from '../core/schedule.js';
 import { t, onChange } from '../core/i18n.js';
-import { escapeHtml, daysCheckboxes, timeRangeFields } from './dom.js';
+import {
+  escapeHtml, daysCheckboxes, timeRangeFields, bindTimeMasks,
+  remindFieldsHtml, handleRemindClick, readRemindInput,
+} from './dom.js';
 
 let root = null;      // контейнер модалки, живёт на странице
 let state = null;     // текущий разбор (после «Разобрать»)
@@ -29,8 +32,69 @@ const TYPE_ICONS = {
   sphere: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.8l-1.8 4.6-4.6 1.8 1.8-4.6z"/></svg>',
 };
 
-function isOpen() {
-  return Boolean(root && root.innerHTML);
+// поля, зависящие от типа: при смене типа перерисовывается только этот блок,
+// кнопки типов/группы и набранный текст остаются на месте (без мерцания)
+function extraHtml() {
+  if (state.kind === 'routine') {
+    return `${timeRangeFields()}
+      <div class="days">${daysCheckboxes()}</div>`;
+  }
+  if (state.kind !== 'task') return '';
+  const def = state.parsed.durationMin || 30;
+  return `
+    <div class="row">
+      <label>${t('task.duration')} <input id="c-dur" type="number" min="5" step="5" value="${def}"></label>
+    </div>
+    <div class="chips">
+      ${[10, 20, 30, 60].map((m) => `<button type="button" class="grp chip${m === def ? ' on' : ''}" data-dur="${m}">${m}</button>`).join('')}
+    </div>
+    <details class="more-params">
+      <summary>${t('task.moreParams')}</summary>
+      <p class="muted">${t('task.moreParamsHint')}</p>
+      <label>${t('task.remind')}</label>
+      ${remindFieldsHtml('c')}
+      <div class="row">
+        <label>${t('repeat.label')}
+          <select id="c-repeat">
+            <option value="">${t('repeat.none')}</option>
+            <option value="daily">${t('repeat.daily')}</option>
+            <option value="weekly">${t('repeat.weekly')}</option>
+            <option value="every">${t('repeat.every')}</option>
+          </select>
+        </label>
+        <label id="c-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="c-repeat-n" type="number" min="2" max="30" value="3"></label>
+      </div>
+      <label>${t('common.sphere')}
+        <select id="c-sphere">
+          <option value="">${t('task.noSphere')}</option>
+          ${state.spheres.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </label>
+    </details>`;
+}
+
+function confirmCardHtml() {
+  return `
+    <div class="card">
+      <div class="row between">
+        <strong id="c-kind">${kindTitle(state.kind)}</strong>
+        <span class="muted">${providerTitle(state.parsed)}</span>
+      </div>
+      <div class="row">
+        ${t('common.type')}:
+        ${['task', 'routine', 'sphere'].map((k) =>
+          `<button type="button" class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${TYPE_ICONS[k]}${t(`type.${k}`)}</button>`).join('')}
+      </div>
+      <p class="muted" id="c-hint">${t(`type.hint.${state.kind}`)}</p>
+      <label>${t('common.title')} <input id="c-title" value="${escapeHtml(state.parsed.title)}"></label>
+      <div class="row">
+        ${t('common.group')}:
+        ${['Н', 'Ж', 'П'].map((g) =>
+          `<button type="button" class="grp${g === state.group ? ' on' : ''}" data-g="${g}">${g} — ${t(`group.${g}`)}</button>`).join('')}
+      </div>
+      <div id="c-extra">${extraHtml()}</div>
+      <div class="row"><button id="c-save">${t('common.save')}</button></div>
+    </div>`;
 }
 
 function render() {
@@ -46,7 +110,7 @@ function render() {
         </div>
         <p class="muted">${t('input.intro')}</p>
         <div class="input-row">
-          <input id="raw" placeholder="${t('input.placeholder')}" value="${escapeHtml(state?.rawInput || '')}">
+          <input id="raw" placeholder="${t('input.placeholder')}" value="${escapeHtml(state?.rawText || '')}">
           <button id="parse">${t('input.parse')}</button>
         </div>
         <div id="confirm">${confirmHtml}</div>
@@ -54,60 +118,20 @@ function render() {
     </div>`;
 }
 
-function confirmCardHtml() {
-  const { parsed } = state;
-  return `
-    <div class="card">
-      <div class="row between">
-        <strong>${kindTitle(state.kind)}</strong>
-        <span class="muted">${providerTitle(parsed)}</span>
-      </div>
-      <div class="row">
-        ${t('common.type')}:
-        ${['task', 'routine', 'sphere'].map((k) =>
-          `<button class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${TYPE_ICONS[k]}${t(`type.${k}`)}</button>`).join('')}
-      </div>
-      <p class="muted">${t(`type.hint.${state.kind}`)}</p>
-      <label>${t('common.title')} <input id="c-title" value="${escapeHtml(parsed.title)}"></label>
-      <div class="row">
-        ${t('common.group')}:
-        ${['Н', 'Ж', 'П'].map((g) =>
-          `<button class="grp${g === state.group ? ' on' : ''}" data-g="${g}">${g} — ${t(`group.${g}`)}</button>`).join('')}
-      </div>
-      ${state.kind === 'routine' ? `
-      ${timeRangeFields()}
-      <div class="days">${daysCheckboxes()}</div>` : ''}
-      ${state.kind === 'task' ? `
-      <div class="row">
-        <label>${t('task.duration')} <input id="c-dur" type="number" min="5" step="5" value="${parsed.durationMin || 30}"></label>
-      </div>
-      <div class="chips">
-        ${[10, 20, 30, 60].map((m) => `<button type="button" class="grp chip${m === (parsed.durationMin || 30) ? ' on' : ''}" data-dur="${m}">${m}</button>`).join('')}
-      </div>
-      <details class="more-params">
-        <summary>${t('task.moreParams')}</summary>
-        <p class="muted">${t('task.moreParamsHint')}</p>
-        <label>${t('task.remindOptional')} <input id="c-remind" type="datetime-local"></label>
-        <div class="row">
-          <label>${t('repeat.label')}
-            <select id="c-repeat">
-              <option value="">${t('repeat.none')}</option>
-              <option value="daily">${t('repeat.daily')}</option>
-              <option value="weekly">${t('repeat.weekly')}</option>
-              <option value="every">${t('repeat.every')}</option>
-            </select>
-          </label>
-          <label id="c-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="c-repeat-n" type="number" min="2" max="30" value="3"></label>
-        </div>
-        <label>${t('common.sphere')}
-          <select id="c-sphere">
-            <option value="">${t('task.noSphere')}</option>
-            ${state.spheres.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
-          </select>
-        </label>
-      </details>` : ''}
-      <div class="row"><button id="c-save">${t('common.save')}</button></div>
-    </div>`;
+// подсветка выбранных кнопок — как радиокнопки, без перерисовки
+function syncTypeButtons() {
+  root.querySelectorAll('[data-kind]').forEach((b) => b.classList.toggle('on', b.dataset.kind === state.kind));
+}
+
+function syncGroupButtons() {
+  root.querySelectorAll('[data-g]').forEach((b) => b.classList.toggle('on', b.dataset.g === state.group));
+}
+
+function syncKind() {
+  root.querySelector('#c-kind').textContent = kindTitle(state.kind);
+  root.querySelector('#c-hint').textContent = t(`type.hint.${state.kind}`);
+  root.querySelector('#c-extra').innerHTML = extraHtml();
+  syncTypeButtons();
 }
 
 export function openAddModal() {
@@ -124,7 +148,16 @@ export function openAddModal() {
         const wrap = root.querySelector('#c-repeat-n-wrap');
         if (wrap) wrap.hidden = e.target.value !== 'every';
       }
+      // группа наследуется от направления — выбирать вручную не нужно
+      if (e.target.id === 'c-sphere' && e.target.value) {
+        const sphere = state?.spheres.find((s) => s.id === e.target.value);
+        if (sphere) {
+          state.group = sphere.group;
+          syncGroupButtons();
+        }
+      }
     });
+    bindTimeMasks(root);
     // смена языка перерисовывает открытую модалку
     onChange(() => {
       if (isOpen()) render();
@@ -134,6 +167,10 @@ export function openAddModal() {
   savedMsg = null;
   render();
   root.querySelector('#raw')?.focus();
+}
+
+function isOpen() {
+  return Boolean(root && root.innerHTML);
 }
 
 function closeModal() {
@@ -147,7 +184,7 @@ async function parse() {
   const text = rawEl.value.trim();
   if (!text) return;
   const [parsed, spheres] = await Promise.all([categorize(text), getAllSpheres()]);
-  state = { parsed, kind: parsed.kind, rawText: text, rawInput: text, group: parsed.group || 'П', spheres };
+  state = { parsed, kind: parsed.kind, rawText: text, group: parsed.group || 'П', spheres };
   render();
   root.querySelector('#raw')?.focus();
 }
@@ -174,8 +211,7 @@ async function save() {
     savedMsg = t('routine.saved', { title });
   } else {
     const dur = Number(confirmEl.querySelector('#c-dur').value) || 30;
-    const remind = confirmEl.querySelector('#c-remind').value;
-    const sphereId = confirmEl.querySelector('#c-sphere').value || null;
+    const sphereId = confirmEl.querySelector('#c-sphere')?.value || null;
     const repeatKind = confirmEl.querySelector('#c-repeat').value;
     const repeatN = Number(confirmEl.querySelector('#c-repeat-n')?.value) || 3;
     await saveTask(new Task({
@@ -185,12 +221,13 @@ async function save() {
       group: state.group,
       durationMin: dur,
       sphereId,
-      dueAt: localInputToTs(remind),
+      dueAt: readRemindInput(root, 'c'),
       status: 'todo',
       source: state.parsed.provider,
       repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
     }));
-    savedMsg = t('task.saved', { title, group: state.group }) + (remind ? ` ${t('task.willRemind')}` : '');
+    const remindDate = root.querySelector('#c-remind-date')?.value;
+    savedMsg = t('task.saved', { title, group: state.group }) + (remindDate ? ` ${t('task.willRemind')}` : '');
   }
   state = null;
   render();
@@ -203,6 +240,7 @@ async function onClick(e) {
     closeModal();
     return;
   }
+  if (handleRemindClick(root, e)) return;
   if (e.target.id === 'parse') {
     await parse();
     return;
@@ -210,15 +248,13 @@ async function onClick(e) {
   const kindBtn = e.target.closest('[data-kind]');
   if (kindBtn && state) {
     state.kind = kindBtn.dataset.kind;
-    state.rawInput = root.querySelector('#raw').value;
-    render();
+    syncKind();
     return;
   }
   const grp = e.target.closest('[data-g]');
   if (grp && state) {
     state.group = grp.dataset.g;
-    state.rawInput = root.querySelector('#raw').value;
-    render();
+    syncGroupButtons();
     return;
   }
   // чип длительности: выбор вместо набора цифр
@@ -226,7 +262,7 @@ async function onClick(e) {
   if (chip) {
     const dur = root.querySelector('#c-dur');
     if (dur) dur.value = chip.dataset.dur;
-    root.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === chip));
+    root.querySelectorAll('.chip[data-dur]').forEach((c) => c.classList.toggle('on', c === chip));
     return;
   }
   if (e.target.id === 'c-save' && state) await save();

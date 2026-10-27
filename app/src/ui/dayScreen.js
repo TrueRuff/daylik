@@ -6,7 +6,7 @@
 import { getPractices, getTasks, updateTask, deleteTask, getAllSpheres, completeTask, savePractice, deletePractice, saveTask } from '../core/storage.js';
 import { categorize } from '../core/categorize.js';
 import { breakdownWithLlm } from '../ai/llmClient.js';
-import { practiceAppliesOn, minutesToTime, timeToMinutes, tsToLocalInput, localInputToTs, todayStr, addDays } from '../core/schedule.js';
+import { practiceAppliesOn, minutesToTime, timeToMinutes, tsToLocalInput, todayStr, addDays } from '../core/schedule.js';
 import {
   buildDay, computeFreeWindows, practicesToBlocks,
   adaptiveSort, autoPlaceLimit, recommendNow,
@@ -15,41 +15,22 @@ import { GROUP_COLORS } from '../core/calendarEvents.js';
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
 import { t, getLang } from '../core/i18n.js';
-import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields, timeSelect } from './dom.js';
+import {
+  escapeHtml, daysCheckboxes, groupOptions, timeRangeFields, timeInput,
+  normalizeTimeValue, bindTimeMasks, remindFieldsHtml, handleRemindClick, readRemindInput,
+} from './dom.js';
 
 const ENERGY_KEY = 'daylik-energy';
 const WELCOME_KEY = 'daylik-welcome';
 
-const PX_PER_MIN = 64 / 60; // высота часа таймлайна, px
 const MINUTES = 1440;
+const DRAG_PX_PER_MIN = 1; // вертикальное перетаскивание карточки меняет время
 
-// раскладка пересекающихся блоков по «дорожкам»: кластеры перекрытий
-// нумеруются отдельно, дорожек в кластере — сколько нужно
-function layoutBlocks(blocks) {
-  const sorted = [...blocks].sort((a, b) => a.start - b.start);
-  const out = [];
-  let cluster = [];
-  let clusterEnd = -1;
-  const flush = () => {
-    if (!cluster.length) return;
-    const laneEnd = [];
-    const laid = cluster.map((b) => {
-      let lane = laneEnd.findIndex((e) => e <= b.start);
-      if (lane === -1) lane = laneEnd.length;
-      laneEnd[lane] = b.end;
-      return { ...b, lane };
-    });
-    laid.forEach((b) => out.push({ ...b, lanes: laneEnd.length }));
-    cluster = [];
-    clusterEnd = -1;
-  };
-  for (const b of sorted) {
-    if (cluster.length && b.start >= clusterEnd) flush();
-    cluster.push(b);
-    clusterEnd = Math.max(clusterEnd, b.end);
-  }
-  flush();
-  return out;
+// длительность словами: '1 ч 30 м'
+function fmtDur(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h ? `${h} ч${m ? ` ${m} м` : ''}` : `${m} м`;
 }
 
 function todayWeekday() {
@@ -111,6 +92,8 @@ export function initDayScreen(root) {
   const modalEl = root.querySelector('#day-modal');
   const scrollEl = root.querySelector('#tl-scroll');
 
+  bindTimeMasks(root);
+
   // сбор данных и отрисовка
 
   async function render() {
@@ -157,14 +140,15 @@ export function initDayScreen(root) {
     const fmt = (min) => `${Math.floor(min / 60)}ч ${String(min % 60).padStart(2, '0')}м`;
 
     state = { date, routines, scheduled, unscheduled, blocks, windows, allTasks, practices, todo,
+      spheres,
       sphereNames: Object.fromEntries(spheres.map((s) => [s.id, s.name])) };
 
-    scrollEl.innerHTML = timelineHtml(layoutBlocks(blocks));
-    // прокрутка к «сейчас»: на скрытом экране (под формой входа) scrollTop
-    // не работает, поэтому ждём, пока экран реально виден
+    scrollEl.innerHTML = timelineHtml(blocks, windows);
+    // прокрутка к разделителю «сейчас»: на скрытом экране не работает,
+    // поэтому ждём, пока экран реально виден
     if (!scrolledToNow && scrollEl.offsetHeight > 0) {
       scrolledToNow = true;
-      scrollEl.scrollTop = Math.max(0, (nowMinutes() - 120) * PX_PER_MIN);
+      scrollEl.querySelector('.tl-now-row')?.scrollIntoView({ block: 'center' });
     }
 
     // шапка дня: «Сегодня» + локализованная дата
@@ -270,13 +254,18 @@ export function initDayScreen(root) {
           </label>
         </div>
         <label>${t('task.startTime')}
-          ${timeSelect('js-estart', task.scheduledDate === todayStr() && task.scheduledStart != null ? minutesToTime(task.scheduledStart) : '', true)}
+          ${timeInput('js-estart', task.scheduledDate === todayStr() && task.scheduledStart != null ? minutesToTime(task.scheduledStart) : '', true)}
           <span class="muted">${t('task.startTimeHint')}</span>
         </label>
         <details class="more-params" ${task.dueAt || task.repeatRule || task.sphereId ? 'open' : ''}>
           <summary>${t('task.moreParams')}</summary>
           <p class="muted">${t('task.moreParamsHint')}</p>
-          <label>${t('task.remind')} <input id="e-remind" type="datetime-local" value="${tsToLocalInput(task.dueAt)}"></label>
+          <label>${t('task.remind')}</label>
+          ${remindFieldsHtml('e', (() => {
+            const dt = tsToLocalInput(task.dueAt);
+            const [d, tm] = dt ? dt.split('T') : ['', '09:00'];
+            return { date: d, time: tm, open: Boolean(task.dueAt) };
+          })())}
           <div class="row">
             <label>${t('repeat.label')}
               <select id="e-repeat">
@@ -345,36 +334,60 @@ export function initDayScreen(root) {
       </div>`;
   }
 
-  // таймлайн дня
+  // день как вертикальный список (по образцу Sunsama): строки блоков в
+  // порядке времени, между ними — свободные окна с кнопкой постановки,
+  // разделитель «сейчас». Высота строки не зависит от длительности.
+  function timelineHtml(blocks, windows) {
+    const items = [
+      ...blocks.map((b) => ({ type: 'block', start: b.start, b })),
+      ...windows.map((w) => ({ type: 'free', start: w.start, end: w.end })),
+    ].sort((a, b) => a.start - b.start || (a.type === 'free' ? -1 : 1));
 
-  function timelineHtml(laid) {
-    const hours = Array.from({ length: 24 }, (_, h) =>
-      `<div class="tl-hour" style="top:${h * 60 * PX_PER_MIN}px"><span>${String(h).padStart(2, '0')}</span></div>`).join('');
-    const cards = laid.map((b) => {
-      const top = b.start * PX_PER_MIN;
-      const height = (Math.min(b.end, MINUTES) - b.start) * PX_PER_MIN;
-      const width = 100 / b.lanes;
-      const left = b.lane * width;
-      const style = `top:${top}px;height:${height}px;left:${left}%;width:calc(${width}% - 8px)`;
-      if (b.kind === 'routine') {
-        return `<div class="tl-card routine" data-practice="${b.id}" style="${style}">
-          <span class="tl-time">${minutesToTime(b.start)}–${minutesToTime(Math.min(b.end, MINUTES))}</span>
-          <span class="tl-title">↻ ${escapeHtml(b.label)}</span>
-        </div>`;
+    const now = nowMinutes();
+    const rows = [];
+    let nowPlaced = false;
+    const pushNow = () => {
+      rows.push(`<div class="tl-row tl-now-row" data-now="${now}">
+        <div class="tl-t">${minutesToTime(now)}</div><div class="tl-now-line"></div>
+      </div>`);
+      nowPlaced = true;
+    };
+
+    for (const item of items) {
+      if (!nowPlaced && item.start > now) pushNow();
+      if (item.type === 'free') {
+        if (item.end - item.start >= 15) {
+          rows.push(`<div class="tl-row" data-start="${item.start}">
+            <div class="tl-t">${minutesToTime(item.start)}</div>
+            <button class="tl-free" data-min="${item.start}" title="${t('day.tapHint')}">
+              <span>${t('day.free', { time: fmtDur(item.end - item.start) })}</span><span class="tl-plus">+</span>
+            </button>
+          </div>`);
+        }
+        continue;
       }
-      return `<div class="tl-card task" data-task="${b.taskId}" data-g="${b.group}" style="${style};background:${GROUP_COLORS[b.group] ?? 'var(--accent)'}">
-        <span class="tl-time">${minutesToTime(b.start)}–${minutesToTime(Math.min(b.end, MINUTES))}</span>
-        <span class="tl-title">${escapeHtml(b.label)}</span>
-        <span class="tl-resize" data-resize="${b.taskId}"></span>
-      </div>`;
-    }).join('');
-    return `
-      <div class="tl">
-        <div class="tl-gutter">${hours}</div>
-        <div class="tl-canvas" id="tl-canvas" title="${t('day.tapHint')}">${cards}
-          <div class="tl-now" style="top:${nowMinutes() * PX_PER_MIN}px"></div>
-        </div>
-      </div>`;
+      const b = item.b;
+      const past = b.end <= now;
+      if (b.kind === 'routine') {
+        rows.push(`<div class="tl-row${past ? ' past' : ''}" data-start="${b.start}">
+          <div class="tl-t">${minutesToTime(b.start)}</div>
+          <div class="tl-card routine" data-practice="${b.id}">
+            <span class="tl-title">↻ ${escapeHtml(b.label)}</span>
+            <span class="tl-dur">${minutesToTime(b.start)}–${minutesToTime(Math.min(b.end, MINUTES))}</span>
+          </div>
+        </div>`);
+      } else {
+        rows.push(`<div class="tl-row${past ? ' past' : ''}" data-start="${b.start}" data-min="${b.start}">
+          <div class="tl-t">${minutesToTime(b.start)}</div>
+          <div class="tl-card task" data-task="${b.taskId}" data-g="${b.group}" style="background:${GROUP_COLORS[b.group] ?? 'var(--accent)'}">
+            <span class="tl-title">${escapeHtml(b.label)}</span>
+            <span class="tl-dur">${fmtDur(b.end - b.start)}</span>
+          </div>
+        </div>`);
+      }
+    }
+    if (!nowPlaced) pushNow();
+    return `<div class="tl-list" id="tl-list">${rows.join('')}</div>`;
   }
 
   // выбор дела на выбранное время: основной способ расстановки — тап,
@@ -413,39 +426,48 @@ export function initDayScreen(root) {
     render();
   }
 
-  // таймлайн: тап-выбор, перенос и растягивание
+  // таймлайн: тап-выбор, перенос карточки по времени, drag из колонки
 
-  function canvas() {
-    return root.querySelector('#tl-canvas');
-  }
-
-  function minuteAt(e) {
-    const r = canvas().getBoundingClientRect();
-    const y = e.clientY - r.top + scrollEl.scrollTop;
-    return Math.max(0, Math.min(MINUTES - 1, y / PX_PER_MIN));
-  }
-
-  let gesture = null;    // активный жест на карточке дела
+  let gesture = null;      // активный жест (карточка или дело из колонки)
   let skipTlClick = false; // клик после перетаскивания подавляется
+
+  function dragBubble(text) {
+    let el = document.querySelector('.drag-time');
+    if (!text) {
+      el?.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'drag-time';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+  }
+
+  function rowAtPoint(x, y) {
+    const el = document.elementFromPoint(x, y);
+    return el?.closest('#tl-list .tl-row') || null;
+  }
 
   root.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || editing || editPractice || pickAt !== null) return;
-    const resize = e.target.closest('.tl-resize');
+
     const card = e.target.closest('.tl-card.task');
-    if (!card) return;
-    const block = state?.blocks.find((b) => b.taskId === card.dataset.task);
-    if (!block) return;
-    gesture = {
-      type: resize ? 'resize' : 'move',
-      id: block.taskId,
-      startY: e.clientY,
-      startMin: block.start,
-      durMin: block.end - block.start,
-      moved: false,
-      card,
-    };
+    if (card) {
+      const block = state?.blocks.find((b) => b.taskId === card.dataset.task);
+      if (!block) return;
+      gesture = { type: 'move', id: block.taskId, startY: e.clientY, startMin: block.start,
+        durMin: block.end - block.start, moved: false, card };
+    } else {
+      const side = e.target.closest('.side-task');
+      if (!side) return;
+      const task = state?.unscheduled.find((x) => x.id === side.dataset.id);
+      if (!task) return;
+      gesture = { type: 'side', id: task.id, task, startY: e.clientY, startX: e.clientX, moved: false, ghost: null };
+    }
     try {
-      card.setPointerCapture(e.pointerId);
+      e.target.setPointerCapture(e.pointerId);
     } catch {
       // события всё равно всплывут до root
     }
@@ -453,35 +475,62 @@ export function initDayScreen(root) {
 
   root.addEventListener('pointermove', (e) => {
     if (!gesture) return;
-    if (!gesture.moved && Math.abs(e.clientY - gesture.startY) < 6) return;
-    if (!gesture.moved) gesture.moved = true;
-    const delta = Math.round((e.clientY - gesture.startY) / PX_PER_MIN);
+    if (!gesture.moved && Math.hypot(e.clientX - gesture.startX, e.clientY - gesture.startY) < 6) return;
+    if (!gesture.moved) {
+      gesture.moved = true;
+      if (gesture.type === 'side') {
+        const ghost = document.createElement('div');
+        ghost.className = 'drag-ghost';
+        ghost.textContent = gesture.task.title;
+        document.body.appendChild(ghost);
+        gesture.ghost = ghost;
+      }
+    }
     if (gesture.type === 'move') {
+      const delta = Math.round((e.clientY - gesture.startY) / DRAG_PX_PER_MIN);
       const ns = Math.max(0, Math.min(MINUTES - gesture.durMin, Math.round((gesture.startMin + delta) / 5) * 5));
       gesture.newStart = ns;
-      gesture.card.style.transform = `translateY(${(ns - gesture.startMin) * PX_PER_MIN}px)`;
+      gesture.card.style.transform = `translateY(${(ns - gesture.startMin) * DRAG_PX_PER_MIN}px)`;
       gesture.card.style.opacity = '.85';
+      dragBubble(`${minutesToTime(ns)}–${minutesToTime(ns + gesture.durMin)}`);
     } else {
-      const nd = Math.max(5, Math.min(480, Math.round((gesture.durMin + delta) / 5) * 5));
-      gesture.newDur = nd;
-      gesture.card.style.height = `${nd * PX_PER_MIN}px`;
+      gesture.ghost.style.left = `${e.clientX}px`;
+      gesture.ghost.style.top = `${e.clientY}px`;
+      gesture.dropRow = rowAtPoint(e.clientX, e.clientY);
+      document.querySelectorAll('#tl-list .tl-row').forEach((r) => r.classList.toggle('drop-row', r === gesture.dropRow));
     }
   });
 
-  root.addEventListener('pointerup', async () => {
+  root.addEventListener('pointerup', async (e) => {
     if (!gesture) return;
     const g = gesture;
     gesture = null;
-    if (!g.moved) return; // клик без движения — откроется карточкой редактирования
+    if (!g.moved) return; // клик без движения — обычные обработчики
     skipTlClick = true;
     setTimeout(() => { skipTlClick = false; }, 80);
-    g.card.style.transform = '';
-    g.card.style.opacity = '';
-    if (g.type === 'move' && g.newStart !== undefined && g.newStart !== g.startMin) {
-      await updateTask(g.id, { scheduledStart: g.newStart });
-      whatNow = null;
-    } else if (g.type === 'resize' && g.newDur !== undefined && g.newDur !== g.durMin) {
-      await updateTask(g.id, { durationMin: g.newDur });
+
+    if (g.type === 'move') {
+      g.card.style.transform = '';
+      g.card.style.opacity = '';
+      dragBubble(null);
+      if (g.newStart !== undefined && g.newStart !== g.startMin) {
+        await updateTask(g.id, { scheduledStart: g.newStart });
+        whatNow = null;
+      }
+      render();
+      return;
+    }
+
+    // дело из колонки бросили на строку дня — ставим на её время
+    g.ghost?.remove();
+    document.querySelectorAll('#tl-list .drop-row').forEach((r) => r.classList.remove('drop-row'));
+    const row = rowAtPoint(e.clientX, e.clientY);
+    const min = Number(row?.dataset.min ?? row?.dataset.start);
+    if (row && !Number.isNaN(min)) {
+      await updateTask(g.id, {
+        scheduledDate: state.date,
+        scheduledStart: Math.min(Math.round(min / 5) * 5, MINUTES - g.task.durationMin),
+      });
       whatNow = null;
     }
     render();
@@ -489,8 +538,13 @@ export function initDayScreen(root) {
 
   root.addEventListener('pointercancel', () => {
     if (!gesture) return;
-    gesture.card.style.transform = '';
-    gesture.card.style.opacity = '';
+    if (gesture.type === 'move') {
+      gesture.card.style.transform = '';
+      gesture.card.style.opacity = '';
+      dragBubble(null);
+    }
+    gesture.ghost?.remove();
+    document.querySelectorAll('#tl-list .drop-row').forEach((r) => r.classList.remove('drop-row'));
     gesture = null;
   });
 
@@ -507,10 +561,9 @@ export function initDayScreen(root) {
       render();
       return;
     }
-    // тап по пустому месту: выбрать дело на это время (шаг 15 мин)
-    if (e.target.closest('#tl-canvas')) {
-      const min = Math.round(minuteAt(e) / 15) * 15;
-      pickAt = Math.min(min, MINUTES - 15);
+    const free = e.target.closest('.tl-free');
+    if (free) {
+      pickAt = Number(free.dataset.min);
       render();
     }
   });
@@ -522,6 +575,8 @@ export function initDayScreen(root) {
   // обработчики
 
   root.addEventListener('click', async (e) => {
+    if (skipTlClick) return;
+    if (handleRemindClick(root, e)) return;
     if (e.target.classList.contains('modal-overlay')) {
       editing = null;
       editPractice = null;
@@ -599,8 +654,8 @@ export function initDayScreen(root) {
         sphereId: old?.sphereId ?? null,
         title,
         days,
-        start: timeToMinutes(card.querySelector('.js-start').value || '23:00'),
-        end: timeToMinutes(card.querySelector('.js-end').value || '07:00'),
+        start: timeToMinutes(normalizeTimeValue(card.querySelector('.js-start').value) || '23:00'),
+        end: timeToMinutes(normalizeTimeValue(card.querySelector('.js-end').value) || '07:00'),
       }));
       editPractice = null;
       render();
@@ -651,12 +706,12 @@ export function initDayScreen(root) {
         durationMin: Number(root.querySelector('#e-dur').value) || 30,
         group: root.querySelector('#e-group').value,
         sphereId: root.querySelector('#e-sphere').value || null,
-        dueAt: localInputToTs(root.querySelector('#e-remind').value),
+        dueAt: readRemindInput(root, 'e'),
         repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
       };
       if (!patch.title) return;
       // ручное время начала: указано — поставить на сегодня; «—» — снять
-      const startVal = root.querySelector('.js-estart')?.value;
+      const startVal = normalizeTimeValue(root.querySelector('.js-estart')?.value);
       if (startVal) {
         patch.scheduledDate = state.date;
         patch.scheduledStart = timeToMinutes(startVal);
@@ -744,11 +799,14 @@ export function initDayScreen(root) {
     if (side) {
       const task = state.unscheduled.find((x) => x.id === side.dataset.id);
       if (!task) return;
-      // влезающее — в первое подходящее окно; длиннее окон — в первое окно
-      // вообще, с перекрытием (оценка приблизительна)
-      const w = state.windows.find((x) => x.end - x.start >= task.durationMin) || state.windows[0];
+      // ставим в первое подходящее окно после текущего момента (не в 00:00
+      // посреди дня); если таких нет — в первое вообще, с перекрытием
+      const nowR = Math.ceil(nowMinutes() / 15) * 15;
+      const fits = (x) => x.end - x.start >= task.durationMin;
+      const w = state.windows.find((x) => fits(x) && x.end > nowR) || state.windows.find(fits) || state.windows[0];
       if (w) {
-        await updateTask(task.id, { scheduledDate: state.date, scheduledStart: w.start });
+        const start = nowR >= w.start && nowR + task.durationMin <= w.end ? nowR : w.start;
+        await updateTask(task.id, { scheduledDate: state.date, scheduledStart: start });
         whatNow = null;
         render();
       }
@@ -760,6 +818,12 @@ export function initDayScreen(root) {
     if (e.target.id === 'e-repeat') {
       const wrap = root.querySelector('#e-repeat-n-wrap');
       if (wrap) wrap.hidden = e.target.value !== 'every';
+    }
+    // группа наследуется от направления — выбирать вручную не нужно
+    if (e.target.id === 'e-sphere' && e.target.value) {
+      const sphere = state.spheres.find((s) => s.id === e.target.value);
+      const group = root.querySelector('#e-group');
+      if (sphere && group) group.value = sphere.group;
     }
   });
 
