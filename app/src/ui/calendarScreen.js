@@ -7,7 +7,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import ruLocale from '@fullcalendar/core/locales/ru';
 import enLocale from '@fullcalendar/core/locales/en-gb';
 import { getPractices, getTasks } from '../core/storage.js';
-import { eventsForRange, allDayEvents, toDateStr } from '../core/calendarEvents.js';
+import { eventsForRange, allDayEvents, toDateStr, GROUP_COLORS } from '../core/calendarEvents.js';
 import { practiceAppliesOn, weekdayOf, minutesToTime } from '../core/schedule.js';
 import { getLang, t, onChange } from '../core/i18n.js';
 import { escapeHtml } from './dom.js';
@@ -47,7 +47,7 @@ export function initCalendarScreen(root) {
       ...tasks.map((x) => `
         <div class="tl-row">
           <div class="tl-t">${x.scheduledStart != null ? minutesToTime(x.scheduledStart) : '—'}</div>
-          <div class="tl-card task" style="background:var(--accent)">
+          <div class="tl-card task" style="background:${GROUP_COLORS[x.group] ?? 'var(--accent)'}">
             <span class="tl-title">${escapeHtml(x.title)}</span>
             ${x.durationMin ? `<span class="tl-dur">${x.durationMin} ${t('task.minutes')}</span>` : ''}
           </div>

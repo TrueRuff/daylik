@@ -279,7 +279,7 @@ input[type='datetime-local'] {
 select { width: auto; min-width: 150px; }
 
 .input-row { display: flex; gap: 8px; }
-.input-row input { flex: 1; width: auto; margin-top: 0; }
+.input-row input { flex: 1; width: auto; margin-top: 0; min-width: 0; }
 
 .grp { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); }
 .grp:hover { background: var(--accent-soft); border-color: var(--line-strong); color: var(--ink); }
@@ -803,7 +803,7 @@ select { width: auto; min-width: 150px; }
 .js-time { width: 96px; font-variant-numeric: tabular-nums; }
 .time-range { display: flex; gap: 10px; }
 .time-range label { flex: 1; }
-.time-range .js-time { width: 100%; }
+.time-range .js-time { width: 100%; min-width: 0; }
 .remind-fields label { display: inline-block; margin-right: 12px; }
 /* дни недели: квадратики вплотную, выбор — заливка плитки */
 .days { display: flex; gap: 0; flex-wrap: wrap; margin: 8px 0; }
@@ -936,7 +936,10 @@ select { width: auto; min-width: 150px; }
   .tl-scroll { max-height: 62vh; }
   .tl-card { font-size: 12.5px; padding: 6px 9px; }
   .tl-t { width: 38px; font-size: 10.5px; }
-  .day span { width: 44px; height: 40px; font-size: 13px; }
+  /* плитки дней делят строку поровну — умещаются в любой ширине */
+  .days { flex-wrap: nowrap; }
+  .day { flex: 1; }
+  .day span { width: 100%; height: 40px; font-size: 13px; }
   .js-time { width: 100%; }
   .input-row { flex-wrap: nowrap; }
 }

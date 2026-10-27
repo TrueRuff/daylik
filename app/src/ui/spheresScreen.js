@@ -14,7 +14,7 @@ import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport
 import { toIcs } from '../core/ics.js';
 import { dayNames, minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
-import { escapeHtml, downloadFile, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
+import { escapeHtml, downloadFile, daysCheckboxes, groupOptions, timeRangeFields, normalizeTimeValue } from './dom.js';
 
 const EXAMPLES = [
   { name: 'Сон', group: 'Н' },
@@ -356,8 +356,8 @@ export function initSpheresScreen(root) {
         sphereId: null,
         title,
         days,
-        start: timeToMinutes(form.querySelector('.js-start').value || '23:00'),
-        end: timeToMinutes(form.querySelector('.js-end').value || '07:00'),
+        start: timeToMinutes(normalizeTimeValue(form.querySelector('.js-start').value) || '23:00'),
+        end: timeToMinutes(normalizeTimeValue(form.querySelector('.js-end').value) || '07:00'),
       }));
       await renderList();
       return;
@@ -436,8 +436,8 @@ export function initSpheresScreen(root) {
         id: crypto.randomUUID(),
         sphereId: e.target.dataset.id,
         title,
-        start: timeToMinutes(card.querySelector('.js-start').value || '09:00'),
-        end: timeToMinutes(card.querySelector('.js-end').value || '10:00'),
+        start: timeToMinutes(normalizeTimeValue(card.querySelector('.js-start').value) || '09:00'),
+        end: timeToMinutes(normalizeTimeValue(card.querySelector('.js-end').value) || '10:00'),
         days,
       });
       await savePractice(practice);

@@ -8,7 +8,7 @@ import { saveTask, saveSphere, savePractice, getAllSpheres } from '../core/stora
 import { timeToMinutes } from '../core/schedule.js';
 import { t, onChange } from '../core/i18n.js';
 import {
-  escapeHtml, daysCheckboxes, timeRangeFields, bindTimeMasks,
+  escapeHtml, daysCheckboxes, timeRangeFields, bindTimeMasks, normalizeTimeValue,
   remindFieldsHtml, handleRemindClick, readRemindInput,
 } from './dom.js';
 
@@ -205,8 +205,8 @@ async function save() {
       id,
       title,
       days,
-      start: timeToMinutes(confirmEl.querySelector('.js-start').value || '09:00'),
-      end: timeToMinutes(confirmEl.querySelector('.js-end').value || '10:00'),
+      start: timeToMinutes(normalizeTimeValue(confirmEl.querySelector('.js-start').value) || '09:00'),
+      end: timeToMinutes(normalizeTimeValue(confirmEl.querySelector('.js-end').value) || '10:00'),
     }));
     savedMsg = t('routine.saved', { title });
   } else {
