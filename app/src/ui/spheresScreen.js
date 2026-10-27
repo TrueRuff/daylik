@@ -1,11 +1,12 @@
 // Экран «Направления»: три группы Н/Ж/П, карточка направления с описаниями
 // и практиками. Карточку можно перетащить в другую колонку — смена группы.
 
-import { Sphere, Practice } from '../core/models.js';
+import { Sphere, Practice, Task } from '../core/models.js';
+import { categorize } from '../core/categorize.js';
 import {
   getAllSpheres, saveSphere, deleteSphere,
   getPractices, savePractice, deletePractice,
-  getTasks, updateTask,
+  getTasks, updateTask, saveTask,
   exportAll, importAll,
 } from '../core/storage.js';
 import { serializeJson, serializeBinary, parseJson, parseBinary, normalizeImport } from '../core/serialization.js';
@@ -45,7 +46,13 @@ export function initSpheresScreen(root) {
 
   async function renderList() {
     const spheres = await getAllSpheres();
-    const freePractices = (await getPractices()).filter((p) => !p.sphereId);
+    const [allPractices, todoTasks] = await Promise.all([getPractices(), getTasks({ status: 'todo' })]);
+    const freePractices = allPractices.filter((p) => !p.sphereId);
+    // счётчики содержимого направления — видны прямо в колонке
+    const taskCount = {};
+    const practiceCount = {};
+    for (const x of todoTasks) if (x.sphereId) taskCount[x.sphereId] = (taskCount[x.sphereId] || 0) + 1;
+    for (const p of allPractices) if (p.sphereId) practiceCount[p.sphereId] = (practiceCount[p.sphereId] || 0) + 1;
     root.innerHTML = `
       <h2>${t('spheres.title')}</h2>
       <p class="muted">${t('spheres.intro')}</p>
@@ -57,7 +64,12 @@ export function initSpheresScreen(root) {
             <div class="sphere-col" data-g="${g}">
               <h3>${g} — ${t(`group.${g}`)}</h3>
               ${list.length
-                ? list.map((s) => `<button class="sphere-item" data-id="${s.id}" title="${t('spheres.dragHint')}">${escapeHtml(s.name)}</button>`).join('')
+                ? list.map((s) => {
+                    const n = taskCount[s.id] || 0;
+                    const m = practiceCount[s.id] || 0;
+                    const meta = n + m ? `<span class="sphere-meta">${t('spheres.meta', { n, m })}</span>` : '';
+                    return `<button class="sphere-item" data-id="${s.id}" title="${t('spheres.dragHint')}"><span class="sphere-name">${escapeHtml(s.name)}</span>${meta}</button>`;
+                  }).join('')
                 : `<p class="muted">${t('spheres.empty')}</p>`}
             </div>`;
         }).join('')}
@@ -72,7 +84,7 @@ export function initSpheresScreen(root) {
       <h3>${t('spheres.freePractices')}</h3>
       ${freePractices.map((p) => `
         <div class="practice-row">
-          <span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
+          <span><span class="routine-mark">↻</span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
           <button class="del-free-practice" data-id="${p.id}" title="${t('common.delete')}">×</button>
         </div>`).join('')}` : ''}
       <p><button id="new-block" class="secondary">${t('day.addRoutine')}</button></p>
@@ -110,16 +122,19 @@ export function initSpheresScreen(root) {
         ${isNew ? '' : `
         <h4>${t('spheres.tasks')}</h4>
         ${tasks.length ? tasks.map((x) => `
-          <div class="practice-row">
-            <span><span class="badge g-${x.group}">${x.group}</span>${escapeHtml(x.title)} <span class="muted">${x.durationMin} мин</span></span>
-            <span class="row">
-              <button class="area-task-done" data-id="${x.id}" title="${t('task.markDone')}">✓</button>
-            </span>
+          <div class="area-task-row" data-g="${x.group}">
+            <span><span class="badge g-${x.group}">${x.group}</span>${escapeHtml(x.title)} <span class="muted">${x.durationMin} ${t('task.minutes')}</span></span>
+            <button class="area-task-done" data-id="${x.id}" title="${t('task.markDone')}">✓</button>
           </div>`).join('') : `<p class="muted">${t('spheres.noTasks')}</p>`}
+        <div class="input-row">
+          <input id="a-task" placeholder="${t('day.quickAdd')}">
+          <button id="a-task-save" class="secondary" data-sphere="${sphere.id}">+</button>
+        </div>
+        <p id="a-task-msg" class="muted"></p>
         <h4>${t('spheres.practices')}</h4>
         ${practices.length ? practices.map((p) => `
           <div class="practice-row">
-            <span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
+            <span><span class="routine-mark">↻</span>${escapeHtml(p.title)} — ${minutesToTime(p.start)}–${minutesToTime(p.end)}, ${formatDays(p.days)}</span>
             <button class="del-practice" data-id="${p.id}" title="${t('common.delete')}">×</button>
           </div>`).join('') : `<p class="muted">${t('spheres.noPractices')}</p>`}
         <label>${t('spheres.newPractice')} <input id="p-title" placeholder="${t('input.placeholder')}"></label>
@@ -303,6 +318,7 @@ export function initSpheresScreen(root) {
 
     if (e.target.classList.contains('del-practice')) {
       await deletePractice(e.target.dataset.id);
+      await renderList(); // счётчики на колонках тоже меняются
       const addBtn = root.querySelector('#add-practice');
       if (addBtn) await openDetail(addBtn.dataset.id);
       return;
@@ -348,8 +364,36 @@ export function initSpheresScreen(root) {
       const tasks = await getTasks({ status: 'todo' });
       const x = tasks.find((y) => y.id === areaDone.dataset.id);
       if (x) await updateTask(x.id, { status: 'done', scheduledDate: null, scheduledStart: null });
+      await renderList(); // счётчики на колонках тоже меняются
       const addBtn = root.querySelector('#add-practice');
       if (addBtn) await openDetail(addBtn.dataset.id);
+      return;
+    }
+
+    // быстрое дело внутри направления: разбор и сохранение с готовой сферой
+    if (e.target.id === 'a-task-save') {
+      const input = root.querySelector('#a-task');
+      const msg = root.querySelector('#a-task-msg');
+      const text = input.value.trim();
+      if (!text) return;
+      const parsed = await categorize(text);
+      if (parsed.kind !== 'task') {
+        msg.textContent = t('spheres.quickKindHint');
+        return;
+      }
+      const sphereId = e.target.dataset.sphere;
+      await saveTask(new Task({
+        id: crypto.randomUUID(),
+        rawText: text,
+        title: parsed.title,
+        group: parsed.group || 'Н',
+        sphereId,
+        durationMin: parsed.durationMin || 30,
+        status: 'todo',
+        source: parsed.provider,
+      }));
+      await renderList();
+      await openDetail(sphereId);
       return;
     }
 
@@ -384,6 +428,7 @@ export function initSpheresScreen(root) {
         days,
       });
       await savePractice(practice);
+      await renderList(); // счётчики на колонках тоже меняются
       await openDetail(practice.sphereId);
     }
   });
@@ -392,6 +437,12 @@ export function initSpheresScreen(root) {
     if (e.target.id === 'import-file' && e.target.files.length) {
       importFile(e.target.files[0]);
       e.target.value = ''; // тот же файл можно выбрать повторно
+    }
+  });
+
+  root.addEventListener('keydown', (e) => {
+    if (e.target.id === 'a-task' && e.key === 'Enter') {
+      root.querySelector('#a-task-save')?.click();
     }
   });
 

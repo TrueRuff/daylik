@@ -19,7 +19,7 @@ import { eventsForRange, GROUP_COLORS } from '../core/calendarEvents.js';
 import { dayStats } from '../core/analytics.js';
 import { Practice, Task } from '../core/models.js';
 import { t, getLang, onChange } from '../core/i18n.js';
-import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields } from './dom.js';
+import { escapeHtml, daysCheckboxes, groupOptions, timeRangeFields, timeSelect } from './dom.js';
 
 const ENERGY_KEY = 'daylik-energy';
 const WELCOME_KEY = 'daylik-welcome';
@@ -230,29 +230,33 @@ export function initDayScreen(root) {
             <select id="e-group">${groupOptions(task.group)}</select>
           </label>
         </div>
-        <label>${t('common.sphere')}
-          <select id="e-sphere">
-            <option value="">${t('task.noSphere')}</option>
-            ${spheres.map((s) =>
-              `<option value="${s.id}"${s.id === task.sphereId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
-          </select>
-        </label>
-        <label>${t('task.remind')} <input id="e-remind" type="datetime-local" value="${tsToLocalInput(task.dueAt)}"></label>
         <label>${t('task.startTime')}
-          <input id="e-start" type="time" step="300" value="${task.scheduledDate === todayStr() && task.scheduledStart != null ? minutesToTime(task.scheduledStart) : ''}">
+          ${timeSelect('js-estart', task.scheduledDate === todayStr() && task.scheduledStart != null ? minutesToTime(task.scheduledStart) : '', true)}
           <span class="muted">${t('task.startTimeHint')}</span>
         </label>
-        <div class="row">
-          <label>${t('repeat.label')}
-            <select id="e-repeat">
-              <option value="">${t('repeat.none')}</option>
-              <option value="daily"${task.repeatRule === 'daily' ? ' selected' : ''}>${t('repeat.daily')}</option>
-              <option value="weekly"${task.repeatRule === 'weekly' ? ' selected' : ''}>${t('repeat.weekly')}</option>
-              <option value="every"${/^every:/.test(task.repeatRule || '') ? ' selected' : ''}>${t('repeat.every')}</option>
+        <details class="more-params" ${task.dueAt || task.repeatRule || task.sphereId ? 'open' : ''}>
+          <summary>${t('task.moreParams')}</summary>
+          <p class="muted">${t('task.moreParamsHint')}</p>
+          <label>${t('task.remind')} <input id="e-remind" type="datetime-local" value="${tsToLocalInput(task.dueAt)}"></label>
+          <div class="row">
+            <label>${t('repeat.label')}
+              <select id="e-repeat">
+                <option value="">${t('repeat.none')}</option>
+                <option value="daily"${task.repeatRule === 'daily' ? ' selected' : ''}>${t('repeat.daily')}</option>
+                <option value="weekly"${task.repeatRule === 'weekly' ? ' selected' : ''}>${t('repeat.weekly')}</option>
+                <option value="every"${/^every:/.test(task.repeatRule || '') ? ' selected' : ''}>${t('repeat.every')}</option>
+              </select>
+            </label>
+            <label id="e-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="e-repeat-n" type="number" min="2" max="30" value="${(/^every:(\d+)/.exec(task.repeatRule || '') || [])[1] || 3}"></label>
+          </div>
+          <label>${t('common.sphere')}
+            <select id="e-sphere">
+              <option value="">${t('task.noSphere')}</option>
+              ${spheres.map((s) =>
+                `<option value="${s.id}"${s.id === task.sphereId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
             </select>
           </label>
-          <label id="e-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="e-repeat-n" type="number" min="2" max="30" value="${(/^every:(\d+)/.exec(task.repeatRule || '') || [])[1] || 3}"></label>
-        </div>
+        </details>
         <div class="row">
           <button id="e-save" data-id="${task.id}">${t('common.save')}</button>
           <button id="e-tomorrow" data-id="${task.id}" class="secondary">${t('task.tomorrow')}</button>
@@ -544,8 +548,8 @@ export function initDayScreen(root) {
         repeatRule: repeatKind === 'every' ? `every:${repeatN}` : (repeatKind || null),
       };
       if (!patch.title) return;
-      // ручное время начала: указано — поставить на сегодня; очищено — снять
-      const startVal = root.querySelector('#e-start')?.value;
+      // ручное время начала: указано — поставить на сегодня; «—» — снять
+      const startVal = root.querySelector('.js-estart')?.value;
       if (startVal) {
         patch.scheduledDate = state.date;
         patch.scheduledStart = timeToMinutes(startVal);

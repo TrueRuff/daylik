@@ -22,6 +22,13 @@ function providerTitle(parsed) {
   return parsed.llmFailed ? t('provider.llmFailed') : t('provider.rules');
 }
 
+// иконки типов: выбор по узнаванию, без чтения подписей
+const TYPE_ICONS = {
+  task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"/></svg>',
+  routine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>',
+  sphere: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.8l-1.8 4.6-4.6 1.8 1.8-4.6z"/></svg>',
+};
+
 function isOpen() {
   return Boolean(root && root.innerHTML);
 }
@@ -58,7 +65,7 @@ function confirmCardHtml() {
       <div class="row">
         ${t('common.type')}:
         ${['task', 'routine', 'sphere'].map((k) =>
-          `<button class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${t(`type.${k}`)}</button>`).join('')}
+          `<button class="grp${k === state.kind ? ' on' : ''}" data-kind="${k}">${TYPE_ICONS[k]}${t(`type.${k}`)}</button>`).join('')}
       </div>
       <p class="muted">${t(`type.hint.${state.kind}`)}</p>
       <label>${t('common.title')} <input id="c-title" value="${escapeHtml(parsed.title)}"></label>
@@ -73,25 +80,32 @@ function confirmCardHtml() {
       ${state.kind === 'task' ? `
       <div class="row">
         <label>${t('task.duration')} <input id="c-dur" type="number" min="5" step="5" value="${parsed.durationMin || 30}"></label>
-        <label>${t('task.remindOptional')} <input id="c-remind" type="datetime-local"></label>
       </div>
-      <div class="row">
-        <label>${t('repeat.label')}
-          <select id="c-repeat">
-            <option value="">${t('repeat.none')}</option>
-            <option value="daily">${t('repeat.daily')}</option>
-            <option value="weekly">${t('repeat.weekly')}</option>
-            <option value="every">${t('repeat.every')}</option>
+      <div class="chips">
+        ${[10, 20, 30, 60].map((m) => `<button type="button" class="grp chip${m === (parsed.durationMin || 30) ? ' on' : ''}" data-dur="${m}">${m}</button>`).join('')}
+      </div>
+      <details class="more-params">
+        <summary>${t('task.moreParams')}</summary>
+        <p class="muted">${t('task.moreParamsHint')}</p>
+        <label>${t('task.remindOptional')} <input id="c-remind" type="datetime-local"></label>
+        <div class="row">
+          <label>${t('repeat.label')}
+            <select id="c-repeat">
+              <option value="">${t('repeat.none')}</option>
+              <option value="daily">${t('repeat.daily')}</option>
+              <option value="weekly">${t('repeat.weekly')}</option>
+              <option value="every">${t('repeat.every')}</option>
+            </select>
+          </label>
+          <label id="c-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="c-repeat-n" type="number" min="2" max="30" value="3"></label>
+        </div>
+        <label>${t('common.sphere')}
+          <select id="c-sphere">
+            <option value="">${t('task.noSphere')}</option>
+            ${state.spheres.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
           </select>
         </label>
-        <label id="c-repeat-n-wrap" hidden>${t('repeat.everyDays')} <input id="c-repeat-n" type="number" min="2" max="30" value="3"></label>
-      </div>
-      <label>${t('common.sphere')}
-        <select id="c-sphere">
-          <option value="">${t('task.noSphere')}</option>
-          ${state.spheres.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
-        </select>
-      </label>` : ''}
+      </details>` : ''}
       <div class="row"><button id="c-save">${t('common.save')}</button></div>
     </div>`;
 }
@@ -205,6 +219,14 @@ async function onClick(e) {
     state.group = grp.dataset.g;
     state.rawInput = root.querySelector('#raw').value;
     render();
+    return;
+  }
+  // чип длительности: выбор вместо набора цифр
+  const chip = e.target.closest('[data-dur]');
+  if (chip) {
+    const dur = root.querySelector('#c-dur');
+    if (dur) dur.value = chip.dataset.dur;
+    root.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === chip));
     return;
   }
   if (e.target.id === 'c-save' && state) await save();
