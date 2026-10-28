@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['app/**']
+    paths: ['app/**', '.github/workflows/deploy.yml']
   workflow_dispatch:
 
 permissions:
@@ -36,6 +36,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
+          overwrite: true
 
   deploy:
     needs: build
