@@ -1,50 +1,52 @@
-// экран «Календарь»: месяц FullCalendar. События рисуются точками
-// загруженности (цвет группы), клик по дню откажет модалку со списком
-// рутин и дел этого дня. Расстановка — на «Дне».
+// экран «Календарь»: месяц сеткой отдельных карточек дней (не таблица).
+// Точки показывают загруженность, наведение — что именно запланировано,
+// клик по дню открывает модалку со списком рутин и дел. Расстановка — на «Дне».
 
-import { Calendar } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import ruLocale from '@fullcalendar/core/locales/ru';
-import enLocale from '@fullcalendar/core/locales/en-gb';
 import { getPractices, getTasks } from '../core/storage.js';
-import { eventsForRange, allDayEvents, toDateStr, GROUP_COLORS } from '../core/calendarEvents.js';
-import { practiceAppliesOn, weekdayOf, minutesToTime } from '../core/schedule.js';
+import { eventsForRange, allDayEvents, toDateStr, GROUP_COLORS, ROUTINE_COLOR } from '../core/calendarEvents.js';
+import { practiceAppliesOn, weekdayOf, minutesToTime, monthGrid, todayStr } from '../core/schedule.js';
 import { getLang, t, onChange } from '../core/i18n.js';
 import { escapeHtml } from './dom.js';
 
+const MAX_DOTS = 3;
+
+const CHEV_LEFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>';
+const CHEV_RIGHT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg>';
+
 export function initCalendarScreen(root) {
   let dirty = true; // данные меняются на других экранах — обновимся при показе
-  let calendar = null;
-  let cache = { practices: [], tasks: [] }; // данные видимого диапазона
+  let gen = 0;      // устаревшая параллельная отрисовка не трогает DOM
+  const now = new Date();
+  let cursor = new Date(now.getFullYear(), now.getMonth(), 1); // первый день месяца
+  let state = { byDate: new Map() };
 
-  // модалка дня живёт рядом с календарём (календарь перерисовывает root)
-  const mount = document.createElement('div');
-  const modal = document.createElement('div');
-  modal.id = 'cal-modal';
-  root.appendChild(mount);
-  root.appendChild(modal);
+  const locale = () => (getLang() === 'en' ? 'en-GB' : 'ru-RU');
+
+  function monthLabel(date) {
+    const raw = date.toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
 
   function dayLabel(dateStr) {
-    return new Date(`${dateStr}T00:00`).toLocaleDateString(
-      getLang() === 'en' ? 'en-GB' : 'ru-RU',
+    return new Date(`${dateStr}T00:00`).toLocaleDateString(locale(),
       { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
   function dayModalHtml(dateStr) {
-    const wd = weekdayOf(dateStr);
-    const routines = cache.practices
-      .filter((p) => practiceAppliesOn(p, wd))
-      .sort((a, b) => a.start - b.start);
-    const tasks = cache.tasks
-      .filter((x) => x.scheduledDate === dateStr)
-      .sort((a, b) => (a.scheduledStart ?? -1) - (b.scheduledStart ?? -1));
+    const { routines = [], tasks = [] } = state.byDate.get(dateStr) || {};
     const rows = [
-      ...routines.map((p) => `
+      ...routines
+        .slice()
+        .sort((a, b) => a.start - b.start)
+        .map((p) => `
         <div class="tl-row">
           <div class="tl-t">${minutesToTime(p.start)}</div>
           <div class="tl-card routine"><span class="tl-title">↻ ${escapeHtml(p.title)}</span></div>
         </div>`),
-      ...tasks.map((x) => `
+      ...tasks
+        .slice()
+        .sort((a, b) => (a.scheduledStart ?? -1) - (b.scheduledStart ?? -1))
+        .map((x) => `
         <div class="tl-row">
           <div class="tl-t">${x.scheduledStart != null ? minutesToTime(x.scheduledStart) : '—'}</div>
           <div class="tl-card task" style="background:${GROUP_COLORS[x.group] ?? 'var(--accent)'}">
@@ -65,52 +67,115 @@ export function initCalendarScreen(root) {
       </div>`;
   }
 
+  // одна карточка дня: число, точки задач (цвет группы) и рутин (серые),
+  // хвост месяца приглушён, сегодня — акцентная обводка
+  function dayCellHtml(date, today) {
+    const rec = state.byDate.get(date) || { events: [], routines: [], tasks: [] };
+    const [y, m, d] = date.split('-').map(Number);
+    const out = y !== cursor.getFullYear() || m - 1 !== cursor.getMonth();
+    const isToday = date === today;
+
+    // задачи — первыми: их цвет группы важнее серых рутин
+    const events = [...rec.events].sort((a, b) =>
+      (a.extendedProps?.kind === 'task' ? 0 : 1) - (b.extendedProps?.kind === 'task' ? 0 : 1));
+    const names = [...rec.tasks.map((x) => x.title), ...rec.routines.map((p) => p.title)];
+    const shown = events.slice(0, MAX_DOTS);
+    const rest = events.length - shown.length;
+    const dots = shown
+      .map((e) => `<span class="cal-dot" style="background:${e.backgroundColor ?? ROUTINE_COLOR}"></span>`)
+      .join('')
+      + (rest ? `<span class="cal-more">+${rest}</span>` : '');
+
+    const tip = names.length
+      ? `${dayLabel(date)}: ${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''}`
+      : `${dayLabel(date)} — ${t('cal.empty')}`;
+
+    return `
+      <button class="cal-day${out ? ' out' : ''}${isToday ? ' today' : ''}"
+        data-date="${date}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(dayLabel(date))}"
+        ${isToday ? 'aria-current="date"' : ''}>
+        <span class="cal-num">${d}</span>
+        <span class="cal-dots">${dots}</span>
+      </button>`;
+  }
+
+  async function render() {
+    const g = ++gen;
+    const [practices, todo] = await Promise.all([getPractices(), getTasks({ status: 'todo' })]);
+    if (g !== gen) return;
+
+    const dates = monthGrid(cursor.getFullYear(), cursor.getMonth());
+    const from = dates[0];
+    const to = dates[dates.length - 1];
+    // тот же поток событий, что рисовал прежний календарь: рутины по дням
+    // недели и дела; хвосты соседних месяцев входят в диапазон
+    const events = [...eventsForRange(from, to, practices, todo), ...allDayEvents(from, to, todo)];
+    const byDate = new Map(dates.map((date) => [date, { events: [], routines: [], tasks: [] }]));
+    for (const ev of events) {
+      const rec = byDate.get(toDateStr(ev.start));
+      if (rec) rec.events.push(ev);
+    }
+    for (const date of dates) {
+      const rec = byDate.get(date);
+      const wd = weekdayOf(date);
+      rec.routines = practices.filter((p) => practiceAppliesOn(p, wd));
+      rec.tasks = todo.filter((x) => x.scheduledDate === date);
+    }
+    state = { byDate };
+
+    const today = todayStr();
+    const cells = dates.map((date) => dayCellHtml(date, today)).join('');
+    const weekdays = t('dayNames').map((d) => `<span>${d}</span>`).join('');
+
+    root.innerHTML = `
+      <div class="cal-bar">
+        <button id="cal-prev" class="icon-btn cal-nav" title="${t('cal.prev')}">${CHEV_LEFT}</button>
+        <h2 class="cal-title">${monthLabel(cursor)}</h2>
+        <button id="cal-next" class="icon-btn cal-nav" title="${t('cal.next')}">${CHEV_RIGHT}</button>
+      </div>
+      <div class="cal-shell">
+        <div class="cal-week" aria-hidden="true">${weekdays}</div>
+        <div class="cal-grid">${cells}</div>
+        <div class="cal-foot">
+          <button id="cal-today" class="secondary">${t('cal.today')}</button>
+        </div>
+      </div>
+      <div id="cal-modal"></div>`;
+  }
+
   root.addEventListener('click', (e) => {
+    if (e.target.closest('#cal-prev') || e.target.closest('#cal-next')) {
+      const step = e.target.closest('#cal-prev') ? -1 : 1;
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + step, 1);
+      render();
+      return;
+    }
+    if (e.target.closest('#cal-today')) {
+      const t0 = new Date();
+      cursor = new Date(t0.getFullYear(), t0.getMonth(), 1);
+      render();
+      return;
+    }
+
+    const modal = root.querySelector('#cal-modal');
     if (e.target.classList.contains('modal-overlay') || e.target.closest('#cal-modal-close')) {
       modal.innerHTML = '';
       return;
     }
-    const day = e.target.closest('.fc-daygrid-day');
+    const day = e.target.closest('.cal-day');
     if (day?.dataset.date) modal.innerHTML = dayModalHtml(day.dataset.date);
   });
 
-  function build() {
-    calendar?.destroy();
-    calendar = new Calendar(mount, {
-      plugins: [dayGridPlugin],
-      initialView: 'dayGridMonth',
-      locale: getLang() === 'en' ? enLocale : ruLocale,
-      firstDay: 1,
-      headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
-      height: 740,
-      dayMaxEvents: 4,
-      moreLinkClick: 'popover',
-      // точки вместо чипов: событие сжимается в кружок цвета группы
-      eventContent: (arg) => ({
-        html: `<span class="cal-dot" style="background:${arg.event.backgroundColor || 'var(--ink-soft)'}" title="${escapeHtml(arg.event.title)}"></span>`,
-      }),
-      // диапазон, который просит календарь, — видимые дни (включая хвосты
-      // соседних месяцев); рутины разворачиваются по каждому дню
-      events: async (info, success) => {
-        const from = toDateStr(info.start);
-        const to = toDateStr(info.end);
-        const practices = await getPractices();
-        const todo = await getTasks({ status: 'todo' });
-        cache = { practices, tasks: todo };
-        success([...eventsForRange(from, to, practices, todo), ...allDayEvents(from, to, todo)]);
-      },
-    });
-    calendar.render();
-  }
-
-  build();
-  onChange(build);
+  // смена языка перерисовывает подписи и месяц
+  onChange(render);
 
   document.addEventListener('tab-shown', (e) => {
     if (e.detail === 'day' || e.detail === 'spheres') dirty = true;
     if (e.detail === 'calendar' && dirty) {
       dirty = false;
-      calendar.refetchEvents();
+      render();
     }
   });
+
+  render();
 }

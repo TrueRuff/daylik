@@ -15,6 +15,7 @@ import { toIcs } from '../core/ics.js';
 import { minutesToTime, timeToMinutes, formatDays } from '../core/schedule.js';
 import { t } from '../core/i18n.js';
 import { escapeHtml, downloadFile, daysCheckboxes, groupOptions, timeRangeFields, normalizeTimeValue } from './dom.js';
+import { installClickGuard, DRAG_PX } from './gesture.js';
 import { getDataOwner } from '../core/storage.js';
 
 const EXAMPLES = [
@@ -24,7 +25,7 @@ const EXAMPLES = [
   { name: 'Учёба', group: 'П' },
 ];
 
-const DRAG_THRESHOLD = 6;
+const DRAG_THRESHOLD = DRAG_PX;
 
 // форма блока дня (рутины без направления: сон, еда). Редактирование —
 // кликом по блоку на «Дне», создание живёт здесь.
@@ -46,6 +47,8 @@ function blockFormHtml() {
 export function initSpheresScreen(root) {
   let drag = null; // перетаскивание карточки между колонками
   let ioPending = null; // сообщение, которое должно пережить перерисовку
+
+  installClickGuard(root);
 
   async function renderList() {
     const spheres = await getAllSpheres();
@@ -255,8 +258,6 @@ export function initSpheresScreen(root) {
     });
   });
 
-  let skipClick = false;
-
   async function finishDrag(cancelled) {
     if (!drag) return;
     const { moved, id, dropG, ghost, el } = drag;
@@ -265,8 +266,7 @@ export function initSpheresScreen(root) {
     root.querySelectorAll('.sphere-col').forEach((col) => col.classList.remove('drop-col'));
     drag = null;
     if (!moved || cancelled) return;
-    skipClick = true;
-    setTimeout(() => { skipClick = false; }, 50);
+    // клик после перетаскивания погасит installClickGuard
     if (dropG) {
       const spheres = await getAllSpheres();
       const sphere = spheres.find((s) => s.id === id);
@@ -282,7 +282,6 @@ export function initSpheresScreen(root) {
   root.addEventListener('pointercancel', () => finishDrag(true));
 
   root.addEventListener('click', async (e) => {
-    if (skipClick) return;
     const item = e.target.closest('.sphere-item');
     if (item) {
       await openDetail(item.dataset.id);

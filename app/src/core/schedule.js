@@ -64,3 +64,16 @@ export function weekdayOf(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return ((new Date(y, m - 1, d).getDay() + 6) % 7) + 1;
 }
+
+// сетка месяца для календаря: 42 даты 'YYYY-MM-DD' (6 недель), неделя с
+// понедельника; в начале и конце — хвосты соседних месяцев. month — 0..11.
+export function monthGrid(year, month) {
+  const first = new Date(year, month, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const out = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(year, month, 1 - offset + i);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  }
+  return out;
+}

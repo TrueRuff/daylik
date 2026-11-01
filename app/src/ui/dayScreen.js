@@ -19,6 +19,7 @@ import {
   escapeHtml, daysCheckboxes, groupOptions, timeRangeFields, timeInput,
   normalizeTimeValue, bindTimeMasks, remindFieldsHtml, handleRemindClick, readRemindInput,
 } from './dom.js';
+import { installClickGuard, DRAG_PX } from './gesture.js';
 
 const ENERGY_KEY = 'daylik-energy';
 const WELCOME_KEY = 'daylik-welcome';
@@ -39,7 +40,8 @@ function todayWeekday() {
 
 function loadEnergy() {
   try {
-    return localStorage.getItem(ENERGY_KEY) || 'normal';
+    const v = localStorage.getItem(ENERGY_KEY);
+    return v === 'low' || v === 'high' ? v : 'normal';
   } catch {
     return 'normal';
   }
@@ -93,6 +95,7 @@ export function initDayScreen(root) {
   const scrollEl = root.querySelector('#tl-scroll');
 
   bindTimeMasks(root);
+  installClickGuard(root);
 
   // сбор данных и отрисовка
 
@@ -149,11 +152,15 @@ export function initDayScreen(root) {
       sphereNames: Object.fromEntries(spheres.map((s) => [s.id, s.name])) };
 
     scrollEl.innerHTML = timelineHtml(blocks, windows);
-    // прокрутка к разделителю «сейчас»: на скрытом экране не работает,
-    // поэтому ждём, пока экран реально виден
+    // прокрутка к разделителю «сейчас» внутри ленты: scrollIntoView тянул
+    // за собой всю страницу и уводил шапку с экрана
     if (!scrolledToNow && scrollEl.offsetHeight > 0) {
       scrolledToNow = true;
-      scrollEl.querySelector('.tl-now-row')?.scrollIntoView({ block: 'center' });
+      const nowRow = scrollEl.querySelector('.tl-now-row');
+      if (nowRow) {
+        const top = nowRow.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop;
+        scrollEl.scrollTop = Math.max(0, top - scrollEl.clientHeight / 2);
+      }
     }
 
     // шапка дня: «Сегодня» + локализованная дата
@@ -183,12 +190,17 @@ export function initDayScreen(root) {
         <button id="quick-save" class="secondary">+</button>
       </div>
       <p id="quick-msg" class="muted"></p>
-      <div class="row between">
-        <span class="muted">${t('energy.label')}:
-          ${['low', 'normal', 'high'].map((e) =>
-            `<button class="grp energy${e === energy ? ' on' : ''}" data-energy="${e}">${t(`energy.${e}`)}</button>`).join('')}
-        </span>
+      <div class="day-tools">
+        <div class="energy-block">
+          <span class="energy-label">${t('energy.label')}</span>
+          <div class="energy-pick" role="group" aria-label="${t('energy.label')}">
+            ${['low', 'normal', 'high'].map((e) =>
+              `<button class="energy${e === energy ? ' on' : ''}" data-energy="${e}"
+                aria-pressed="${e === energy}">${t(`energy.${e}`)}</button>`).join('')}
+          </div>
+        </div>
         <button id="auto-place" class="secondary">${t('day.autoPlace')}</button>
+        <p class="energy-hint muted">${t(`energy.hint.${energy}`)}</p>
       </div>
       <p class="muted">${stats.summary}${todo.length || routines.length ? '' : ` — ${t('day.emptyHint')}`}</p>
       ${stats.overloadMin > 0 ? `<p class="overload">${t('day.overload', { time: fmt(stats.overloadMin) })}</p>` : ''}
@@ -434,7 +446,6 @@ export function initDayScreen(root) {
   // таймлайн: тап-выбор, перенос карточки по времени, drag из колонки
 
   let gesture = null;      // активный жест (карточка или дело из колонки)
-  let skipTlClick = false; // клик после перетаскивания подавляется
 
   function dragBubble(text) {
     let el = document.querySelector('.drag-time');
@@ -480,7 +491,7 @@ export function initDayScreen(root) {
 
   root.addEventListener('pointermove', (e) => {
     if (!gesture) return;
-    if (!gesture.moved && Math.hypot(e.clientX - gesture.startX, e.clientY - gesture.startY) < 6) return;
+    if (!gesture.moved && Math.hypot(e.clientX - gesture.startX, e.clientY - gesture.startY) < DRAG_PX) return;
     if (!gesture.moved) {
       gesture.moved = true;
       if (gesture.type === 'side') {
@@ -515,8 +526,7 @@ export function initDayScreen(root) {
     const g = gesture;
     gesture = null;
     if (!g.moved) return; // клик без движения — обычные обработчики
-    skipTlClick = true;
-    setTimeout(() => { skipTlClick = false; }, 80);
+    // дальше жест: клик после отпускания погасит installClickGuard
 
     if (g.type === 'move') {
       g.card.style.transform = '';
@@ -564,7 +574,6 @@ export function initDayScreen(root) {
   });
 
   scrollEl.addEventListener('click', async (e) => {
-    if (skipTlClick) return;
     const card = e.target.closest('.tl-card');
     if (card) {
       if (card.classList.contains('routine')) {
@@ -590,7 +599,6 @@ export function initDayScreen(root) {
   // обработчики
 
   root.addEventListener('click', async (e) => {
-    if (skipTlClick) return;
     if (handleRemindClick(root, e)) return;
     if (e.target.classList.contains('modal-overlay')) {
       editing = null;

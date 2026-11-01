@@ -66,6 +66,9 @@ export const DICTS = {
     'task.remindDate': 'Выбрать дату',
     'task.remindTime': 'Время',
     'cal.empty': 'ничего не запланировано',
+    'cal.prev': 'Предыдущий месяц',
+    'cal.next': 'Следующий месяц',
+    'cal.today': 'Сегодня',
 
     // обзор приложения
     'onb.title': 'Обзор Дейлика',
@@ -107,6 +110,9 @@ export const DICTS = {
     'energy.low': 'мало',
     'energy.normal': 'норм',
     'energy.high': 'много',
+    'energy.hint.low': 'мало сил: сначала короткие дела до 30 минут, автоукладка ставит не больше трёх',
+    'energy.hint.normal': 'норм: по важности групп Н → Ж → П, внутри — короткие вперёд',
+    'energy.hint.high': 'много сил: внутри группы сначала длинные дела, без лимита',
 
     'common.type': 'Тип',
     'type.task': 'Разовое',
@@ -271,6 +277,9 @@ export const DICTS = {
     'task.remindDate': 'Pick a date',
     'task.remindTime': 'Time',
     'cal.empty': 'nothing planned',
+    'cal.prev': 'Previous month',
+    'cal.next': 'Next month',
+    'cal.today': 'Today',
 
     // app tour
     'onb.title': 'Daylik tour',
@@ -312,6 +321,9 @@ export const DICTS = {
     'energy.low': 'low',
     'energy.normal': 'ok',
     'energy.high': 'high',
+    'energy.hint.low': 'low energy: short tasks under 30 minutes first, auto-plan places at most three',
+    'energy.hint.normal': 'ok: by group importance Н → Ж → П, shorter tasks first',
+    'energy.hint.high': 'high energy: longer tasks first within a group, no limit',
 
     'common.type': 'Type',
     'type.task': 'One-off',

@@ -88,7 +88,7 @@ let swipe = null;
 
 document.addEventListener('touchstart', (e) => {
   if (e.touches.length !== 1 || !e.target.closest) { swipe = null; return; }
-  if (e.target.closest('nav, .task-row, .sphere-item, .tl-card, .modal-overlay, input, textarea, select')) {
+  if (e.target.closest('nav, .task-row, .sphere-item, .tl-card, .cal-shell, .modal-overlay, input, textarea, select')) {
     swipe = null;
     return;
   }
